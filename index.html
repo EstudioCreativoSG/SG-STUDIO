@@ -879,7 +879,6 @@ body.sg-gate-open { overflow: hidden; }
     <button class="tab-btn" data-view="biblia">Biblia</button>
     <button class="tab-btn active" data-view="parrilla">Parrilla</button>
     <button class="tab-btn" data-view="estudio">Estudio IA</button>
-    <button class="tab-btn" data-view="skills">Skills</button>
   </div>
 </nav>
 
@@ -1166,57 +1165,6 @@ body.sg-gate-open { overflow: hidden; }
   </div>
 </main>
 
-<main id="view-skills" style="display:none;">
-  <section class="cover" style="min-height:auto; padding-bottom:2rem;">
-    <p class="kicker">CATÁLOGO DE SKILLS DE CLAUDE CODE</p>
-    <h1 class="big-script script">Tu caja<br>de herramientas</h1>
-    <p class="sub">Todas las skills que tienes instaladas en Claude Code, con su comando exacto y para qué sirve cada una. Búscalas por lo que necesitas hacer, no por su nombre técnico.</p>
-    <div style="max-width:520px; margin-top:1.5rem;">
-      <input type="text" id="skills-search" placeholder="Ej: guiones, redactar anuncios, revisar SEO..." style="width:100%; padding:0.85rem 1.1rem; border-radius:999px; border:1px solid var(--linen-warm); font-family:inherit; font-size:0.95rem; background:var(--white); color:var(--ink);">
-    </div>
-    <div style="margin-top:1.25rem; display:flex; gap:0.6rem; flex-wrap:wrap;">
-      <button class="empty-btn" id="skills-add-btn">+ Agregar skill</button>
-    </div>
-  </section>
-
-  <section style="max-width:980px; margin:0 auto; padding:0 1.5rem 4rem;">
-    <div id="skills-empty" class="empty-state" style="display:none;">
-      <p class="script">Todavía no hay skills en el catálogo</p>
-      <p class="sub">Agrega la primera con el botón de arriba, o instala el pack de marketing de Corey Haines y regístralas aquí para no olvidar cómo se llaman.</p>
-    </div>
-    <div id="skills-list"></div>
-  </section>
-</main>
-
-<div class="gw-modal-overlay" id="skill-modal-overlay">
-  <div class="gw-modal" style="max-width:520px;">
-    <button class="gw-modal-close" id="skill-modal-close">×</button>
-    <h3 id="skill-modal-title">Nueva skill</h3>
-    <input type="hidden" id="skill-form-id">
-    <div class="gw-field">
-      <label>Nombre de la skill</label>
-      <input type="text" id="skill-form-nombre" placeholder="copywriting">
-    </div>
-    <div class="gw-field">
-      <label>Comando para invocarla</label>
-      <input type="text" id="skill-form-comando" placeholder="npx skills add coreyhaines31/marketingskills --skill copywriting">
-    </div>
-    <div class="gw-field">
-      <label>Categoría</label>
-      <input type="text" id="skill-form-categoria" placeholder="Copywriting, SEO, Guiones, Diseño...">
-    </div>
-    <div class="gw-field">
-      <label>Qué hace (sé específico — esto es lo que se busca)</label>
-      <textarea id="skill-form-descripcion" rows="3" placeholder="Ej: Redacta guiones para reels y TikTok con hooks, ritmo y cierre. Útil para contenido de video corto." style="width:100%; font-family:inherit; padding:0.6rem 0.8rem; border-radius:10px; border:1px solid var(--linen-warm); resize:vertical;"></textarea>
-    </div>
-    <div class="gw-field">
-      <label>Palabras clave extra (opcional, separadas por coma)</label>
-      <input type="text" id="skill-form-keywords" placeholder="guion, reel, tiktok, hook, video corto">
-    </div>
-    <button class="empty-btn" id="skill-form-save" style="width:100%;">Guardar skill</button>
-  </div>
-</div>
-
 <main id="view-frameworks" style="display:none;">
   <section class="cover" style="min-height:auto; padding-bottom:2rem;">
     <p class="kicker">CÓMO PIENSA EL ESTUDIO IA</p>
@@ -1387,6 +1335,23 @@ function sgCreateSample() {
   }
   sample.limits = async () => ({ remaining: null, resetsAt: null }); // el backend propio no tiene límites de Claude
   return sample;
+}
+
+// Genera una imagen real con Gemini ("Nano Banana") a partir de una
+// descripción de texto. Devuelve un data URI listo para <img src="...">.
+async function sgGenerateImage(prompt) {
+  const res = await sgBackendCall({ action: "generate_image", prompt: prompt });
+  return res.imageDataUri;
+}
+
+// Detecta si el mensaje del usuario está pidiendo generar una imagen
+// (no solo hablar de contenido visual), para decidir si se llama a
+// sgGenerateImage además de responder por texto.
+function pareceQuierePedirImagen(texto) {
+  const t = skillNorm(texto || "");
+  const verbos = ["genera", "crea", "dibuja", "haz", "diseña", "muestra"];
+  const sustantivos = ["imagen", "foto", "diseño", "ilustracion", "arte", "grafico", "banner", "portada", "logo"];
+  return verbos.some(v => t.indexOf(v) !== -1) && sustantivos.some(s => t.indexOf(s) !== -1);
 }
 /* ============================================================
    Fin del puente hacia el backend propio
@@ -1785,9 +1750,7 @@ function switchView(v) {
   document.getElementById("view-biblia").style.display = v==="biblia" ? "" : "none";
   document.getElementById("view-parrilla").style.display = v==="parrilla" ? "" : "none";
   document.getElementById("view-estudio").style.display = v==="estudio" ? "" : "none";
-  document.getElementById("view-skills").style.display = v==="skills" ? "" : "none";
   document.getElementById("view-frameworks").style.display = v==="frameworks" ? "" : "none";
-  if (v === "skills") initSkillsCatalog();
   if (v === "frameworks") initFrameworksView();
   closeDetail();
   window.scrollTo({top:0, behavior:"instant"});
@@ -1991,6 +1954,34 @@ async function sendChat() {
   stopBtn.addEventListener("click", () => activeAbort.abort());
 
   const turns = [{ role: "user", content: BRAND_CONTEXT }, ...chatTurns];
+
+  // Si el mensaje pide generar una imagen, se genera con Gemini y se muestra
+  // directo en el chat (además de la respuesta de texto habitual).
+  if (pareceQuierePedirImagen(text)) {
+    thinkBubble.textContent = "Generando imagen...";
+    try {
+      const dataUri = await sgGenerateImage(text);
+      thinkBubble.classList.remove("thinking");
+      thinkBubble.innerHTML = "";
+      const img = document.createElement("img");
+      img.src = dataUri;
+      img.className = "chat-img-thumb";
+      img.style.cssText = "max-width:100%; border-radius:10px; display:block;";
+      thinkBubble.appendChild(img);
+      chatTurns.push({ role: "assistant", content: "(se generó una imagen a partir de: " + text + ")" });
+      chatScrollBottom();
+      return;
+    } catch (e) {
+      thinkBubble.remove();
+      showChatBanner("Algo falló generando la imagen: " + (e.message || "error") + ".");
+      chatTurns.pop();
+      return;
+    } finally {
+      activeAbort = null;
+      stopBtn.remove();
+      document.getElementById("chat-send-btn").style.display = "";
+    }
+  }
 
   try {
     const result = await claudeSample(turns, {
@@ -2856,238 +2847,18 @@ gInit();
 
 </script>
 <script>
-/* ================= CATÁLOGO DE SKILLS (Claude Code) ================= */
-let skillsDb = null;
-let skillsCache = [];
-let unsubSkills = null;
-let skillsInitDone = false;
-
-function initSkillsCatalog() {
-  if (skillsInitDone) return;
-  skillsInitDone = true;
-  try { skillsDb = sgCreateDb(); } catch (e) { skillsDb = null; }
-  if (!skillsDb) return;
-
-  let firstLoad = true;
-  unsubSkills = skillsDb.collection("skills").orderBy("nombre", "asc").onSnapshot(
-    (snap) => {
-      skillsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      if (firstLoad && skillsCache.length === 0) {
-        firstLoad = false;
-        seedSkillsCatalog();
-      } else {
-        renderSkillsList(document.getElementById("skills-search").value || "");
-      }
-    },
-    (err) => { console.error("skills onSnapshot error", err); }
-  );
-
-  document.getElementById("skills-search").addEventListener("input", (e) => {
-    renderSkillsList(e.target.value);
-  });
-  document.getElementById("skills-add-btn").addEventListener("click", () => openSkillModal(null));
-  document.getElementById("skill-modal-close").addEventListener("click", closeSkillModal);
-  document.getElementById("skill-modal-overlay").addEventListener("click", (e) => {
-    if (e.target.id === "skill-modal-overlay") closeSkillModal();
-  });
-  document.getElementById("skill-form-save").addEventListener("click", saveSkillForm);
-}
-
-// Precarga inicial: solo corre si el catálogo está vacío la primera vez.
-// Son las skills reales del pack "marketingskills" de Corey Haines
-// (github.com/coreyhaines31/marketingskills). Edítalas o bórralas libremente.
-function seedSkillsCatalog() {
-  const base = "npx skills add coreyhaines31/marketingskills --skill ";
-  const seed = [
-    { nombre: "copywriting", categoria: "Copywriting",
-      descripcion: "Escribe copy persuasivo para páginas web, landing pages, emails y anuncios. Enfocado en beneficios, claridad y llamadas a la acción.",
-      keywords: "texto publicitario, landing page, anuncio, cta, headline" },
-    { nombre: "seo-audit", categoria: "SEO",
-      descripcion: "Auditoría técnica y de contenido de SEO: rastreo, indexación, Core Web Vitals, y calidad de contenido, con plan de acción priorizado.",
-      keywords: "posicionamiento, google, buscadores, auditoria web" },
-    { nombre: "marketing-psychology", categoria: "Estrategia",
-      descripcion: "Aplica principios de psicología del consumidor (prueba social, aversión a la pérdida, etc.) a mensajes, diseño y flujos de conversión.",
-      keywords: "persuasion, comportamiento, ventas" },
-    { nombre: "social-content", categoria: "Redes sociales",
-      descripcion: "Genera contenido nativo para LinkedIn, X (Twitter) e Instagram, adaptado al formato y tono de cada plataforma.",
-      keywords: "instagram, linkedin, twitter, publicaciones, posts, guiones, guion para reels" },
-    { nombre: "content-strategy", categoria: "Estrategia de contenido",
-      descripcion: "Planifica calendarios editoriales y clusters de temas: qué escribir después y por qué, según prioridad de negocio.",
-      keywords: "calendario editorial, plan de contenido, blog" },
-    { nombre: "programmatic-seo", categoria: "SEO",
-      descripcion: "Crea programas de contenido SEO a gran escala manteniendo calidad consistente en muchas páginas similares.",
-      keywords: "paginas masivas, escalar contenido" },
-    { nombre: "pricing-strategy", categoria: "Pricing",
-      descripcion: "Estructura páginas de precios: nombres de planes, anclaje de precios y optimización para conversión.",
-      keywords: "precios, planes, tarifas" },
-    { nombre: "page-cro", categoria: "CRO",
-      descripcion: "Analiza y optimiza la tasa de conversión de landing pages y páginas de producto.",
-      keywords: "conversion, landing page, optimizacion" },
-    { nombre: "launch-strategy", categoria: "Lanzamientos",
-      descripcion: "Planea el go-to-market de un lanzamiento: canales, secuencia de mensajes y momento de cada acción.",
-      keywords: "gtm, lanzamiento de producto, plan de lanzamiento" },
-    { nombre: "signup-flow-cro", categoria: "CRO",
-      descripcion: "Optimiza el flujo de registro/onboarding para reducir fricción y aumentar los registros completados.",
-      keywords: "onboarding, registro, formulario" },
-    { nombre: "ab-test-setup", categoria: "Analytics",
-      descripcion: "Diseña y configura pruebas A/B para optimización de marketing, con hipótesis medibles.",
-      keywords: "test ab, experimentos, analytics" },
-  ];
-  Promise.all(seed.map(s => skillsDb.collection("skills").add({
-    nombre: s.nombre, categoria: s.categoria, descripcion: s.descripcion,
-    keywords: s.keywords, comando: base + s.nombre
-  }))).catch(err => console.error("seed skills error", err));
-}
+/* ================= VISTA DE FRAMEWORKS (métodos que usa el Estudio IA) ================= */
 
 // Normaliza texto para comparar sin tildes ni mayúsculas
 function skillNorm(s) {
   return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
-
-// Diccionario de sinónimos: si buscas "guiones", también debe encontrar
-// skills categorizadas o descritas con estas palabras relacionadas.
-const SKILL_SYNONYMS = {
-  "guion": ["guiones", "script", "reel", "video", "hook", "storytelling"],
-  "guiones": ["guion", "script", "reel", "video", "hook", "storytelling"],
-  "anuncio": ["anuncios", "ads", "publicidad", "copy", "copywriting"],
-  "anuncios": ["anuncio", "ads", "publicidad", "copy", "copywriting"],
-  "publicidad": ["anuncios", "ads", "copywriting"],
-  "seo": ["posicionamiento", "buscadores", "google"],
-  "correo": ["email", "mail", "newsletter"],
-  "email": ["correo", "mail", "newsletter"],
-  "redes": ["social", "socialmedia", "instagram", "contenido"],
-  "conversion": ["cro", "ventas", "landing"],
-  "precio": ["pricing", "precios"],
-  "lanzamiento": ["launch", "gtm"],
-};
-
-function skillMatches(skill, query) {
-  const q = skillNorm(query).trim();
-  if (!q) return true;
-  const haystack = skillNorm([
-    skill.nombre, skill.categoria, skill.descripcion, skill.keywords, skill.comando
-  ].join(" "));
-  if (haystack.indexOf(q) !== -1) return true;
-  // busca también por sinónimos de cada palabra escrita
-  const words = q.split(/\s+/).filter(Boolean);
-  return words.some(w => {
-    const syns = SKILL_SYNONYMS[w] || [];
-    return syns.some(syn => haystack.indexOf(skillNorm(syn)) !== -1);
-  });
-}
-
-function renderSkillsList(query) {
-  const root = document.getElementById("skills-list");
-  const empty = document.getElementById("skills-empty");
-  const filtered = skillsCache.filter(s => skillMatches(s, query));
-
-  if (skillsCache.length === 0) {
-    empty.style.display = "";
-    empty.querySelector(".script").textContent = "Todavía no hay skills en el catálogo";
-    root.innerHTML = "";
-    return;
-  }
-  if (filtered.length === 0) {
-    empty.style.display = "";
-    empty.querySelector(".script").textContent = "Ninguna skill coincide con \"" + query + "\"";
-    root.innerHTML = "";
-    return;
-  }
-  empty.style.display = "none";
-
-  root.innerHTML = filtered.map(s => {
-    const cat = s.categoria ? '<span class="pill-tag">' + escapeHtml(s.categoria) + '</span>' : "";
-    return (
-      '<div class="skill-card" data-id="' + s.id + '">' +
-        '<div class="skill-card-head">' +
-          '<h3>' + escapeHtml(s.nombre || "(sin nombre)") + '</h3>' +
-          cat +
-        '</div>' +
-        '<p class="skill-desc">' + escapeHtml(s.descripcion || "") + '</p>' +
-        '<div class="skill-cmd-row">' +
-          '<code class="skill-cmd">' + escapeHtml(s.comando || "") + '</code>' +
-          '<button class="skill-copy-btn" data-cmd="' + escapeHtml(s.comando || "") + '">Copiar</button>' +
-        '</div>' +
-        '<div class="skill-actions">' +
-          '<button class="skill-edit-btn" data-id="' + s.id + '">Editar</button>' +
-          '<button class="skill-delete-btn" data-id="' + s.id + '">Eliminar</button>' +
-        '</div>' +
-      '</div>'
-    );
-  }).join("");
-
-  root.querySelectorAll(".skill-copy-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      navigator.clipboard.writeText(btn.dataset.cmd).then(() => {
-        const old = btn.textContent;
-        btn.textContent = "¡Copiado!";
-        setTimeout(() => { btn.textContent = old; }, 1500);
-      }).catch(() => {});
-    });
-  });
-  root.querySelectorAll(".skill-edit-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const skill = skillsCache.find(s => s.id === btn.dataset.id);
-      if (skill) openSkillModal(skill);
-    });
-  });
-  root.querySelectorAll(".skill-delete-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      if (confirm("¿Eliminar esta skill del catálogo?")) {
-        skillsDb.doc("skills/" + btn.dataset.id).delete().catch(err => console.error(err));
-      }
-    });
-  });
-}
-
 function escapeHtml(str) {
   return String(str || "").replace(/[&<>"']/g, m => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[m]));
 }
 
-function openSkillModal(skill) {
-  document.getElementById("skill-modal-title").textContent = skill ? "Editar skill" : "Nueva skill";
-  document.getElementById("skill-form-id").value = skill ? skill.id : "";
-  document.getElementById("skill-form-nombre").value = skill ? (skill.nombre || "") : "";
-  document.getElementById("skill-form-comando").value = skill ? (skill.comando || "") : "";
-  document.getElementById("skill-form-categoria").value = skill ? (skill.categoria || "") : "";
-  document.getElementById("skill-form-descripcion").value = skill ? (skill.descripcion || "") : "";
-  document.getElementById("skill-form-keywords").value = skill ? (skill.keywords || "") : "";
-  document.getElementById("skill-modal-overlay").classList.add("open");
-}
-function closeSkillModal() {
-  document.getElementById("skill-modal-overlay").classList.remove("open");
-}
-function saveSkillForm() {
-  const nombre = document.getElementById("skill-form-nombre").value.trim();
-  if (!nombre) { document.getElementById("skill-form-nombre").focus(); return; }
-  const id = document.getElementById("skill-form-id").value; // vacío = skill nueva
-  const doc = {
-    nombre: nombre,
-    comando: document.getElementById("skill-form-comando").value.trim(),
-    categoria: document.getElementById("skill-form-categoria").value.trim(),
-    descripcion: document.getElementById("skill-form-descripcion").value.trim(),
-    keywords: document.getElementById("skill-form-keywords").value.trim()
-  };
-  const btn = document.getElementById("skill-form-save");
-  btn.disabled = true; btn.textContent = "Guardando...";
-  const promise = id
-    ? skillsDb.doc("skills/" + id).set(Object.assign({ id }, doc))
-    : skillsDb.collection("skills").add(doc);
-  promise.then(() => {
-    closeSkillModal();
-  }).catch(err => {
-    console.error(err);
-    btn.textContent = "Error, intenta de nuevo";
-  }).finally(() => {
-    btn.disabled = false;
-    if (btn.textContent === "Guardando...") btn.textContent = "Guardar skill";
-  });
-}
-</script>
-<script>
-/* ================= VISTA DE FRAMEWORKS (métodos que usa el Estudio IA) ================= */
 let fwDb = null;
 let fwCache = [];
 let fwInitDone = false;
