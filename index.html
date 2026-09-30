@@ -1226,27 +1226,75 @@ async function sgBackendCall(payload) {
 }
 
 // ---- db: imita collection()/doc()/onSnapshot()/set()/add() ----
+// Traduce una ruta tipo Firestore (colección/doc/colección/doc/...) a una
+// sola hoja física de Google Sheets + un filtro fijo con el "camino" de padres
+// como columnas. Sheets no tiene subcolecciones anidadas, así que cualquier
+// nivel de anidamiento (ej. "proyectos/X/meses/Y/piezas", "meses/X/piezas")
+// se aplana: el nombre de la ÚLTIMA colección de la ruta es la hoja física
+// (ej. "Piezas", "Insights", "Referencias"), y cada par (colección-padre, id)
+// anterior se guarda como columna de filtro (ej. proyectoId=X, mesId=Y).
+// Esto evita que cada mes o proyecto cree una hoja nueva, y es compatible con
+// lo que ya guarda Code.gs (crear_pieza usa args.mesId, por ejemplo).
+const SG_PARENT_FIELD_MAP = {
+  "proyectos": "proyectoId",
+  "meses": "mesId"
+};
+
+function sgResolvePath_(path) {
+  const parts = String(path).split("/").filter(Boolean);
+  // Con longitud IMPAR termina en colección ("a/b/c" → colección c): es una
+  // referencia de colección. Con longitud PAR termina en id ("a/b/c/d" →
+  // documento d dentro de la colección c): es una referencia de documento.
+  const isDocPath = parts.length % 2 === 0;
+  const collectionParts = isDocPath ? parts.slice(0, -1) : parts;
+  const docId = isDocPath ? parts[parts.length - 1] : undefined;
+
+  const sheetNameRaw = collectionParts[collectionParts.length - 1];
+  const sheetName = sheetNameRaw.charAt(0).toUpperCase() + sheetNameRaw.slice(1); // "piezas" -> "Piezas"
+
+  const fixedFilter = {};
+  // recorre los pares (colección-padre, id-padre) que quedan antes de la última colección
+  for (let i = 0; i + 1 < collectionParts.length; i += 2) {
+    const parentCollection = collectionParts[i];
+    const parentId = collectionParts[i + 1];
+    const field = SG_PARENT_FIELD_MAP[parentCollection] || (parentCollection.replace(/s$/, "") + "Id");
+    fixedFilter[field] = parentId;
+  }
+  return {
+    sheetName: sheetName,
+    fixedFilter: Object.keys(fixedFilter).length ? fixedFilter : null,
+    id: docId
+  };
+}
+
 function sgCreateDb() {
   return {
-    collection(sheetName) {
-      return sgCollectionRef(sheetName, null);
+    collection(path) {
+      const r = sgResolvePath_(path);
+      return sgCollectionRef(r.sheetName, r.fixedFilter);
     },
     doc(path) {
-      // path viene como "coleccion/id" o "coleccion/id/sub/idSub" (se usa solo el primer nivel aquí)
-      const parts = String(path).split("/");
-      const sheetName = parts[0];
-      const id = parts[1];
-      return sgDocRef(sheetName, id);
+      const r = sgResolvePath_(path);
+      return sgDocRef(r.sheetName, r.id, r.fixedFilter);
     }
   };
 }
 
-function sgCollectionRef(sheetName, _parentFilter) {
+function sgCollectionRef(sheetName, fixedFilter) {
   let orderField = null, orderDir = "asc";
   const ref = {
     orderBy(field, dir) { orderField = field; orderDir = dir || "asc"; return ref; },
+    doc(id) {
+      // permite col.doc(id).set(...) además de col.add(...) — usado por el
+      // botón "Cargar plan de Octubre" para fijar el id de cada pieza.
+      return sgDocRef(sheetName, id, fixedFilter);
+    },
     async add(docData) {
-      const doc = await sgBackendCall({ action: "write", sheet: sheetName, doc: docData });
+      // fixedFilter (ej. { mesId: "octubre-2026" }) se mezcla automáticamente
+      // para que una pieza creada en esta "subcolección" quede etiquetada con
+      // su mes sin que el resto del código tenga que saberlo.
+      const merged = fixedFilter ? Object.assign({}, fixedFilter, docData) : docData;
+      const doc = await sgBackendCall({ action: "write", sheet: sheetName, doc: merged });
       return { id: doc.doc.id };
     },
     onSnapshot(callback, errorCallback) {
@@ -1254,7 +1302,7 @@ function sgCollectionRef(sheetName, _parentFilter) {
       async function poll() {
         if (stopped) return;
         try {
-          const res = await sgBackendCall({ action: "read", sheet: sheetName });
+          const res = await sgBackendCall({ action: "read", sheet: sheetName, filter: fixedFilter || null });
           let rows = res.rows || [];
           if (orderField) {
             rows = rows.slice().sort((a, b) => {
@@ -1278,10 +1326,10 @@ function sgCollectionRef(sheetName, _parentFilter) {
   return ref;
 }
 
-function sgDocRef(sheetName, id) {
+function sgDocRef(sheetName, id, fixedFilter) {
   return {
     async set(docData) {
-      const merged = Object.assign({}, docData, { id: id || docData.id });
+      const merged = Object.assign({}, fixedFilter || {}, docData, { id: id || docData.id });
       await sgBackendCall({ action: "write", sheet: sheetName, doc: merged });
     },
     async delete() {
@@ -1292,7 +1340,8 @@ function sgDocRef(sheetName, id) {
       async function poll() {
         if (stopped) return;
         try {
-          const res = await sgBackendCall({ action: "read", sheet: sheetName, filter: { id: id } });
+          const filter = Object.assign({}, fixedFilter || {}, { id: id });
+          const res = await sgBackendCall({ action: "read", sheet: sheetName, filter: filter });
           const row = (res.rows && res.rows[0]) || null;
           callback({ exists: !!row, id: id, data: () => row });
         } catch (e) {
@@ -1612,6 +1661,21 @@ async function seedOctubre() {
   }
 }
 
+// Variante para cargar las 20 piezas de octubre en un mes que YA existe (por
+// ejemplo, si el usuario ya creó "Octubre 2026" a mano y quedó vacío).
+// No toca las fases del mes, solo agrega las piezas.
+async function seedOctubreEnMes(mesId) {
+  const btn = document.getElementById("seed-btn-inline");
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Cargando...'; }
+  try {
+    const col = claudeDb.collection("meses/" + mesId + "/piezas");
+    await Promise.all(SEED_OCTUBRE.map(p => col.doc(p.id).set(p)));
+  } catch (e) {
+    console.error(e);
+    if (btn) { btn.disabled = false; btn.textContent = "Hubo un problema. Intenta de nuevo."; }
+  }
+}
+
 /* ---------------- parrilla render ---------------- */
 function renderParrillaShell() {
   const root = document.getElementById("parrilla-content");
@@ -1644,7 +1708,10 @@ function renderParrillaShell() {
   '</section>';
 
   if (!piezasCache.length) {
-    html += '<div class="empty-state"><p class="script">Esta parrilla está vacía</p><p class="sub">Ve al Estudio IA y pídele que arme el contenido de ' + (mes ? mes.label : "este mes") + '.</p></div>';
+    const esOctubre = mes && /oct/i.test(mes.id + " " + (mes.label || ""));
+    html += '<div class="empty-state"><p class="script">Esta parrilla está vacía</p><p class="sub">Ve al Estudio IA y pídele que arme el contenido de ' + (mes ? mes.label : "este mes") + '.</p>' +
+      (esOctubre ? '<button class="empty-btn" id="seed-btn-inline">Cargar plan de Octubre 2026</button>' : '') +
+    '</div>';
   } else {
     html += '<section class="grid-view">' +
       '<div class="par-table-wrap" id="table-mode" style="' + (currentMode==="table"?"":"display:none;") + '">' +
@@ -1665,6 +1732,7 @@ function renderParrillaShell() {
   document.querySelectorAll(".vs-btn").forEach(btn => {
     btn.addEventListener("click", () => { currentMode = btn.dataset.mode; renderParrillaShell(); });
   });
+  document.getElementById("seed-btn-inline")?.addEventListener("click", () => seedOctubreEnMes(currentMesId));
 
   if (piezasCache.length) { renderTable(); renderBoard(); }
 }
