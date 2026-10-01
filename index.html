@@ -4,6 +4,39 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>SG IA Studio</title>
+<script type="module">
+  // SDK de Firebase (Firestore + Storage) cargado como módulo ES desde el CDN
+  // oficial de Google. Se expone en window.* para que el resto del HTML
+  // (scripts normales, no-módulo) pueda usarlo sin convertir todo el archivo
+  // a módulos.
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+  import {
+    getFirestore, collection, doc, setDoc, addDoc, deleteDoc, onSnapshot,
+    query, orderBy as fbOrderBy, where, getDocs, getDoc
+  } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+  import {
+    getStorage, ref as storageRef, uploadString, getDownloadURL
+  } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-storage.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCrs8W2PHFCkSOyNn-nWKb9VKiohm2Hjo8",
+    authDomain: "sg-estudio-creativo.firebaseapp.com",
+    projectId: "sg-estudio-creativo",
+    storageBucket: "sg-estudio-creativo.firebasestorage.app",
+    messagingSenderId: "703561420994",
+    appId: "1:703561420994:web:79cef78d8848378ccf6b5b"
+  };
+
+  const fbApp = initializeApp(firebaseConfig);
+  window.__fb = {
+    db: getFirestore(fbApp),
+    storage: getStorage(fbApp),
+    collection, doc, setDoc, addDoc, deleteDoc, onSnapshot,
+    query, orderBy: fbOrderBy, where, getDocs, getDoc,
+    storageRef, uploadString, getDownloadURL
+  };
+  window.dispatchEvent(new Event("firebase-ready"));
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Fraunces:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
@@ -1225,132 +1258,79 @@ async function sgBackendCall(payload) {
   return data;
 }
 
-// ---- db: imita collection()/doc()/onSnapshot()/set()/add() ----
-// Traduce una ruta tipo Firestore (colección/doc/colección/doc/...) a una
-// sola hoja física de Google Sheets + un filtro fijo con el "camino" de padres
-// como columnas. Sheets no tiene subcolecciones anidadas, así que cualquier
-// nivel de anidamiento (ej. "proyectos/X/meses/Y/piezas", "meses/X/piezas")
-// se aplana: el nombre de la ÚLTIMA colección de la ruta es la hoja física
-// (ej. "Piezas", "Insights", "Referencias"), y cada par (colección-padre, id)
-// anterior se guarda como columna de filtro (ej. proyectoId=X, mesId=Y).
-// Esto evita que cada mes o proyecto cree una hoja nueva, y es compatible con
-// lo que ya guarda Code.gs (crear_pieza usa args.mesId, por ejemplo).
-const SG_PARENT_FIELD_MAP = {
-  "proyectos": "proyectoId",
-  "meses": "mesId"
-};
-
-function sgResolvePath_(path) {
-  const parts = String(path).split("/").filter(Boolean);
-  // Con longitud IMPAR termina en colección ("a/b/c" → colección c): es una
-  // referencia de colección. Con longitud PAR termina en id ("a/b/c/d" →
-  // documento d dentro de la colección c): es una referencia de documento.
-  const isDocPath = parts.length % 2 === 0;
-  const collectionParts = isDocPath ? parts.slice(0, -1) : parts;
-  const docId = isDocPath ? parts[parts.length - 1] : undefined;
-
-  const sheetNameRaw = collectionParts[collectionParts.length - 1];
-  const sheetName = sheetNameRaw.charAt(0).toUpperCase() + sheetNameRaw.slice(1); // "piezas" -> "Piezas"
-
-  const fixedFilter = {};
-  // recorre los pares (colección-padre, id-padre) que quedan antes de la última colección
-  for (let i = 0; i + 1 < collectionParts.length; i += 2) {
-    const parentCollection = collectionParts[i];
-    const parentId = collectionParts[i + 1];
-    const field = SG_PARENT_FIELD_MAP[parentCollection] || (parentCollection.replace(/s$/, "") + "Id");
-    fixedFilter[field] = parentId;
-  }
-  return {
-    sheetName: sheetName,
-    fixedFilter: Object.keys(fixedFilter).length ? fixedFilter : null,
-    id: docId
-  };
+// ---- db: puente real hacia Firestore, con la MISMA interfaz que antes
+// (collection().doc().set().onSnapshot()...) para no tener que tocar el
+// resto del código de la app. Firestore sí soporta subcolecciones anidadas
+// de forma nativa (a diferencia de Google Sheets), así que aquí ya no hace
+// falta "aplanar" rutas tipo "meses/X/piezas" — se le pasan tal cual al SDK.
+async function sgWaitFirebase_() {
+  if (window.__fb) return window.__fb;
+  await new Promise(resolve => window.addEventListener("firebase-ready", resolve, { once: true }));
+  return window.__fb;
 }
 
 function sgCreateDb() {
   return {
-    collection(path) {
-      const r = sgResolvePath_(path);
-      return sgCollectionRef(r.sheetName, r.fixedFilter);
-    },
-    doc(path) {
-      const r = sgResolvePath_(path);
-      return sgDocRef(r.sheetName, r.id, r.fixedFilter);
-    }
+    collection(path) { return sgCollectionRef(path); },
+    doc(path) { return sgDocRef(path); }
   };
 }
 
-function sgCollectionRef(sheetName, fixedFilter) {
+function sgCollectionRef(path) {
   let orderField = null, orderDir = "asc";
   const ref = {
     orderBy(field, dir) { orderField = field; orderDir = dir || "asc"; return ref; },
-    doc(id) {
-      // permite col.doc(id).set(...) además de col.add(...) — usado por el
-      // botón "Cargar plan de Octubre" para fijar el id de cada pieza.
-      return sgDocRef(sheetName, id, fixedFilter);
-    },
+    doc(id) { return sgDocRef(path + "/" + id); },
     async add(docData) {
-      // fixedFilter (ej. { mesId: "octubre-2026" }) se mezcla automáticamente
-      // para que una pieza creada en esta "subcolección" quede etiquetada con
-      // su mes sin que el resto del código tenga que saberlo.
-      const merged = fixedFilter ? Object.assign({}, fixedFilter, docData) : docData;
-      const doc = await sgBackendCall({ action: "write", sheet: sheetName, doc: merged });
-      return { id: doc.doc.id };
+      const fb = await sgWaitFirebase_();
+      const colRef = fb.collection(fb.db, ...path.split("/"));
+      const docRef = await fb.addDoc(colRef, docData);
+      return { id: docRef.id };
     },
     onSnapshot(callback, errorCallback) {
+      let unsub = () => {};
       let stopped = false;
-      async function poll() {
+      sgWaitFirebase_().then(fb => {
         if (stopped) return;
-        try {
-          const res = await sgBackendCall({ action: "read", sheet: sheetName, filter: fixedFilter || null });
-          let rows = res.rows || [];
-          if (orderField) {
-            rows = rows.slice().sort((a, b) => {
-              const av = a[orderField], bv = b[orderField];
-              if (av < bv) return orderDir === "desc" ? 1 : -1;
-              if (av > bv) return orderDir === "desc" ? -1 : 1;
-              return 0;
-            });
-          }
-          const docs = rows.map(r => ({ id: r.id, data: () => r }));
+        const colRef = fb.collection(fb.db, ...path.split("/"));
+        const q = orderField ? fb.query(colRef, fb.orderBy(orderField, orderDir)) : colRef;
+        unsub = fb.onSnapshot(q, (snap) => {
+          const docs = snap.docs.map(d => ({ id: d.id, data: () => d.data() }));
           callback({ docs, empty: docs.length === 0, size: docs.length });
-        } catch (e) {
-          if (errorCallback) errorCallback(e);
-        }
-        if (!stopped) setTimeout(poll, SG_POLL_MS);
-      }
-      poll();
-      return () => { stopped = true; }; // función de "unsubscribe"
+        }, (err) => { if (errorCallback) errorCallback(err); });
+      });
+      return () => { stopped = true; unsub(); }; // función de "unsubscribe"
     }
   };
   return ref;
 }
 
-function sgDocRef(sheetName, id, fixedFilter) {
+function sgDocRef(path) {
   return {
     async set(docData) {
-      const merged = Object.assign({}, fixedFilter || {}, docData, { id: id || docData.id });
-      await sgBackendCall({ action: "write", sheet: sheetName, doc: merged });
+      const fb = await sgWaitFirebase_();
+      const parts = path.split("/");
+      const ref = fb.doc(fb.db, ...parts);
+      await fb.setDoc(ref, docData, { merge: false });
+      return { id: parts[parts.length - 1] };
     },
     async delete() {
-      await sgBackendCall({ action: "delete", sheet: sheetName, id: id });
+      const fb = await sgWaitFirebase_();
+      const ref = fb.doc(fb.db, ...path.split("/"));
+      await fb.deleteDoc(ref);
     },
     onSnapshot(callback, errorCallback) {
+      let unsub = () => {};
       let stopped = false;
-      async function poll() {
+      const id = path.split("/").pop();
+      sgWaitFirebase_().then(fb => {
         if (stopped) return;
-        try {
-          const filter = Object.assign({}, fixedFilter || {}, { id: id });
-          const res = await sgBackendCall({ action: "read", sheet: sheetName, filter: filter });
-          const row = (res.rows && res.rows[0]) || null;
-          callback({ exists: !!row, id: id, data: () => row });
-        } catch (e) {
-          if (errorCallback) errorCallback(e);
-        }
-        if (!stopped) setTimeout(poll, SG_POLL_MS);
-      }
-      poll();
-      return () => { stopped = true; };
+        const ref = fb.doc(fb.db, ...path.split("/"));
+        unsub = fb.onSnapshot(ref, (snap) => {
+          callback({ exists: snap.exists(), id: id, data: () => snap.data() });
+        }, (err) => { if (errorCallback) errorCallback(err); });
+      });
+      return () => { stopped = true; unsub(); };
     }
   };
 }
