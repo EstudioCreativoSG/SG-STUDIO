@@ -355,6 +355,17 @@ table.par-table tr:hover td { background: #F3F0FB; }
 .estado-pill { display:inline-block; border-radius: 5px; padding: 0.24rem 0.6rem; font-size: 0.7rem; font-weight: 600; white-space: nowrap; }
 .estado-porgrabar { background: var(--ink); color: var(--linen); }
 .estado-idea { background: transparent; border: 1px solid var(--line); color: var(--ink-soft); }
+/* flujo de producción completo (Notion-style), de frío a cálido conforme avanza */
+.estado-guion { background: #EDE7FB; color: #5B3FA6; }
+.estado-pendiente { background: #FFF1DB; color: #A8661A; }
+.estado-produccion { background: #FFE3D1; color: #B6481B; }
+.estado-edicion { background: #FDE0EC; color: #B3246B; }
+.estado-revision { background: #FFF5CC; color: #8C6D00; }
+.estado-programado { background: #DCEBFF; color: #1A5DAD; }
+.estado-publicado { background: #DAF4E4; color: #1C7A42; }
+.estado-select { appearance:none; -webkit-appearance:none; border:none; cursor:pointer; font-family:inherit; border-radius:5px; padding:0.24rem 1.6rem 0.24rem 0.6rem; font-size:0.7rem; font-weight:600;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23666' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position: right 0.5rem center; }
 .prioridad-pill { display:inline-flex; align-items:center; gap:0.35rem; font-size: 0.7rem; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
 .prioridad-pill::before { content:""; width:7px; height:7px; border-radius:50%; display:inline-block; }
 .prioridad-imprescindible::before { background: var(--slate); }
@@ -415,6 +426,43 @@ table.par-table tr.clickable-row { cursor: pointer; }
 .dp-ficha-title { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.1em; color: var(--ink); margin-bottom: 1.2rem; text-transform: uppercase; }
 .dp-ficha-item { border-left: 2px solid var(--slate-pale); padding: 0.1rem 0 0.1rem 1rem; margin-bottom: 1.3rem; }
 .dp-ficha-item .dp-label { color: var(--ink-soft); }
+
+/* --- edición inline del panel de detalle (estilo Notion) --- */
+.dp-delete { position:absolute; top: calc(1rem + env(safe-area-inset-top, 0px)); right: 3.8rem; background: rgba(240,235,226,0.12); border:none; color: var(--linen); width:32px; height:32px; border-radius:50%; font-size:0.95rem; }
+.dp-delete:hover { background: #C0392B; }
+.dp-title[contenteditable] { outline:none; cursor:text; border-radius:6px; }
+.dp-title[contenteditable]:hover, .dp-title[contenteditable]:focus { background: rgba(240,235,226,0.08); }
+.dp-save-indicator { position:absolute; top: calc(1rem + env(safe-area-inset-top, 0px)); right: 7.2rem; font-size:0.7rem; color: var(--slate-pale); opacity:0; transition: opacity 0.2s; }
+.dp-save-indicator.show { opacity:1; }
+.dp-meta-edit { display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.6rem; align-items:center; }
+.dp-meta-edit select {
+  appearance:none; -webkit-appearance:none; background: rgba(240,235,226,0.12); color: var(--linen);
+  border:1px solid rgba(240,235,226,0.28); border-radius:6px; padding:0.3rem 1.6rem 0.3rem 0.65rem;
+  font-family:inherit; font-size:0.76rem; cursor:pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23F0EBE2' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position: right 0.55rem center;
+}
+.dp-meta-edit input[type="date"] {
+  background: rgba(240,235,226,0.12); color: var(--linen); border:1px solid rgba(240,235,226,0.28);
+  border-radius:6px; padding:0.3rem 0.6rem; font-family:inherit; font-size:0.76rem; color-scheme: dark;
+}
+.dp-obj[contenteditable] { outline:none; min-height:1.4rem; cursor:text; }
+.dp-field-text { width:100%; border:1px solid transparent; border-radius:8px; padding:0.5rem 0.6rem; margin:-0.5rem -0.6rem; font-family:inherit; font-size:0.92rem; color:var(--ink); font-weight:300; line-height:1.55; resize:vertical; background:transparent; }
+.dp-field-text:hover { border-color: var(--line); }
+.dp-field-text:focus { outline:none; border-color: var(--slate-pale); background: var(--white); }
+.dp-add-block-btn { background:none; border:1px dashed var(--line); border-radius:8px; padding:0.5rem 0.9rem; font-size:0.78rem; color: var(--ink-soft); width:100%; margin-top:0.4rem; }
+/* adjuntos: imágenes y links de referencia */
+.dp-attach-grid { display:flex; flex-wrap:wrap; gap:0.6rem; margin-top:0.6rem; }
+.dp-attach-img { position:relative; width:84px; height:84px; border-radius:8px; overflow:hidden; border:1px solid var(--line); }
+.dp-attach-img img { width:100%; height:100%; object-fit:cover; display:block; }
+.dp-attach-img .dp-attach-remove { position:absolute; top:2px; right:2px; background:rgba(0,0,0,0.6); color:#fff; border:none; width:18px; height:18px; border-radius:50%; font-size:0.65rem; line-height:1; }
+.dp-attach-add { width:84px; height:84px; border-radius:8px; border:1px dashed var(--line); display:flex; align-items:center; justify-content:center; font-size:1.3rem; color: var(--ink-soft); cursor:pointer; background: var(--linen); }
+.dp-link-row { display:flex; align-items:center; gap:0.5rem; margin-top:0.4rem; font-size:0.84rem; }
+.dp-link-row a { color: var(--slate-deep); text-decoration: underline; word-break: break-all; flex:1; }
+.dp-link-remove { background:none; border:none; color: var(--ink-soft); font-size:0.9rem; flex-shrink:0; }
+.dp-link-add-row { display:flex; gap:0.5rem; margin-top:0.6rem; }
+.dp-link-add-row input { flex:1; border:1px solid var(--line); border-radius:8px; padding:0.45rem 0.7rem; font-family:inherit; font-size:0.84rem; }
+.dp-link-add-row button { background: var(--slate); color:#fff; border:none; border-radius:8px; padding:0.45rem 0.9rem; font-size:0.78rem; font-weight:600; flex-shrink:0; }
 
 /* =======================================================
    VOLTA STUDIO — workspace shell, meses, chat IA
@@ -1221,10 +1269,12 @@ body.sg-gate-open { overflow: hidden; }
 <aside class="detail-panel" id="detail-panel">
   <div class="dp-head">
     <button class="dp-close" id="dp-close" aria-label="Cerrar">×</button>
+    <button class="dp-delete" id="dp-delete" title="Eliminar pieza">🗑</button>
     <p class="dp-id" id="dp-id"></p>
-    <h3 class="dp-title" id="dp-title"></h3>
-    <div class="dp-meta" id="dp-meta"></div>
-    <div class="dp-obj" id="dp-obj"></div>
+    <h3 class="dp-title" id="dp-title" contenteditable="true" data-field="pieza"></h3>
+    <span class="dp-save-indicator" id="dp-save-indicator"></span>
+    <div class="dp-meta-edit" id="dp-meta-edit"></div>
+    <div class="dp-obj" id="dp-obj" contenteditable="true" data-field="objetivoText"></div>
   </div>
   <div class="dp-body" id="dp-body"></div>
 </aside>
@@ -1373,6 +1423,22 @@ async function sgGenerateImage(prompt) {
   return res.imageDataUri;
 }
 
+// Sube un archivo de imagen elegido por el usuario (referencia visual) a
+// Firebase Storage, y devuelve la URL pública para guardarla junto a la pieza.
+async function sgUploadImage(file, pathPrefix) {
+  const fb = await sgWaitFirebase_();
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+  const path = pathPrefix + "/" + Date.now() + "-" + file.name.replace(/[^a-zA-Z0-9.]/g, "_");
+  const ref = fb.storageRef(fb.storage, path);
+  await fb.uploadString(ref, dataUrl, "data_url");
+  return await fb.getDownloadURL(ref);
+}
+
 // Detecta si el mensaje del usuario está pidiendo generar una imagen
 // (no solo hablar de contenido visual), para decidir si se llama a
 // sgGenerateImage además de responder por texto.
@@ -1415,6 +1481,35 @@ const PRIORIDAD_CLASS = {
   "IMPRESCINDIBLE":"prioridad-imprescindible","IMPORTANTE":"prioridad-importante",
   "OPCIONAL":"prioridad-opcional","ESPONTÁNEO":"prioridad-espontaneo"
 };
+
+// CANAL = dónde se publica (red social / medio). FORMATO = qué tipo de
+// contenido es dentro de ese canal. Antes estaban mezclados en un solo campo.
+const CANALES = ["Instagram", "TikTok", "WhatsApp", "Facebook", "YouTube", "Web/Blog", "Otro"];
+const FORMATOS_POR_CANAL = {
+  "Instagram": ["Reel", "Carrusel", "Post único", "Story", "Live"],
+  "TikTok": ["Video", "Live"],
+  "WhatsApp": ["Mensaje directo", "Estado"],
+  "Facebook": ["Post", "Reel", "Story", "Evento"],
+  "YouTube": ["Short", "Video largo"],
+  "Web/Blog": ["Artículo", "Página"],
+  "Otro": ["Otro"]
+};
+
+// Flujo de producción completo (Notion-style). El orden importa: define el
+// avance visual en el tablero y la progresión esperada.
+const ESTADO_FLOW = [
+  { id: "idea", label: "Idea", class: "estado-idea" },
+  { id: "guion", label: "Guion", class: "estado-guion" },
+  { id: "pendiente", label: "Pendiente", class: "estado-pendiente" },
+  { id: "produccion", label: "En producción", class: "estado-produccion" },
+  { id: "edicion", label: "En edición", class: "estado-edicion" },
+  { id: "revision", label: "En revisión", class: "estado-revision" },
+  { id: "programado", label: "Programado", class: "estado-programado" },
+  { id: "publicado", label: "Publicado", class: "estado-publicado" }
+];
+function estadoInfo(estadoLabel) {
+  return ESTADO_FLOW.find(e => e.label === estadoLabel) || ESTADO_FLOW[0];
+}
 
 const BRAND_CONTEXT = `Eres el Estudio Creativo de VOLTA, una marca de pizza que se comporta como una marca gastronómica con mirada propia, no como una pizzería que usa redes para anunciar productos.
 
@@ -1695,7 +1790,7 @@ function renderParrillaShell() {
   } else {
     html += '<section class="grid-view">' +
       '<div class="par-table-wrap" id="table-mode" style="' + (currentMode==="table"?"":"display:none;") + '">' +
-        '<table class="par-table"><thead><tr><th>#</th><th>Fecha</th><th>Pieza</th><th>Formato</th><th>Pilar</th><th>Estado</th><th>Prioridad</th></tr></thead>' +
+        '<table class="par-table"><thead><tr><th>#</th><th>Fecha</th><th>Pieza</th><th>Canal</th><th>Formato</th><th>Pilar</th><th>Estado</th><th>Prioridad</th></tr></thead>' +
         '<tbody id="table-body"></tbody></table>' +
       '</div>' +
       '<div class="board" id="board-mode" style="' + (currentMode==="board"?"":"display:none;") + '"></div>' +
@@ -1718,7 +1813,7 @@ function renderParrillaShell() {
 }
 
 function pillarPill(p){ return '<span class="pilar-pill ' + (PILAR_CLASS[p]||"") + '">' + p + '</span>'; }
-function estadoPill(e){ const cls = e==="Por grabar" ? "estado-porgrabar" : "estado-idea"; return '<span class="estado-pill ' + cls + '">' + (e||"Idea") + '</span>'; }
+function estadoPill(e){ const info = estadoInfo(e); return '<span class="estado-pill ' + info.class + '">' + info.label + '</span>'; }
 function prioridadPill(p){ return '<span class="prioridad-pill ' + (PRIORIDAD_CLASS[p]||"") + '">' + (p||"") + '</span>'; }
 
 function renderTable() {
@@ -1729,6 +1824,7 @@ function renderTable() {
     '<tr class="clickable-row" data-id="' + it.id + '"><td class="id-cell">' + (it.numero||it.id) + '</td>' +
     '<td class="fecha-cell">' + fechaDisplay(it.fechaISO) + '</td>' +
     '<td class="pieza-cell">' + it.pieza + '</td>' +
+    '<td><span class="fmt-tag">' + (it.canal||"—") + '</span></td>' +
     '<td><span class="fmt-tag">' + it.formato + '</span></td>' +
     '<td>' + pillarPill(it.pilar) + '</td>' +
     '<td>' + estadoPill(it.estado) + '</td>' +
@@ -1755,41 +1851,247 @@ function renderBoard() {
 }
 
 /* ---------------- detail panel ---------------- */
+let dpCurrentId = null; // id de la pieza abierta en el panel de detalle
+
+// Guarda un campo (o varios) de la pieza abierta en Firestore. Se llama en
+// cada "blur" de un campo editable — no hay botón "Guardar": como Notion.
+async function savePieza(fields) {
+  if (!dpCurrentId || !currentMesId) return;
+  const indicator = document.getElementById("dp-save-indicator");
+  try {
+    indicator.textContent = "Guardando...";
+    indicator.classList.add("show");
+    await claudeDb.doc("meses/" + currentMesId + "/piezas/" + dpCurrentId).set(
+      Object.assign({}, piezasCache.find(x => x.id === dpCurrentId), fields, { id: dpCurrentId })
+    );
+    Object.assign(piezasCache.find(x => x.id === dpCurrentId) || {}, fields);
+    indicator.textContent = "Guardado";
+    setTimeout(() => indicator.classList.remove("show"), 1200);
+  } catch (e) {
+    console.error("savePieza error", e);
+    indicator.textContent = "Error al guardar";
+  }
+}
+
 function openDetail(id) {
   const it = piezasCache.find(x => x.id === id);
   if (!it) return;
+  dpCurrentId = id;
   document.getElementById("dp-id").textContent = (it.numero ? "PIEZA " + it.numero : it.id.toUpperCase());
-  document.getElementById("dp-title").textContent = it.pieza;
-  document.getElementById("dp-meta").innerHTML =
-    '<span class="fmt-tag">' + it.formato + '</span>' +
-    '<span>' + fechaDisplay(it.fechaISO) + '</span>' +
-    '<span>Producción: ' + (it.produccion||"—") + '</span>' +
-    estadoPill(it.estado) + prioridadPill(it.prioridad);
-  document.getElementById("dp-obj").innerHTML = (it.objetivo||[]).map(o => '<span>' + o + '</span>').join("");
 
-  const blocks = [];
-  if (it.hook) blocks.push('<p class="dp-hook script">&ldquo;' + it.hook + '&rdquo;</p>');
-  const simple = [
-    ['Idea', it.idea], ['Concepto / desarrollo', it.concepto], ['Guion / copy', it.guion],
-    ['Caption', it.caption], ['CTA', it.cta], ['Conversación que buscamos', it.conversacion],
-    ['Material necesario', it.material], ['Notas de dirección creativa', it.notas]
+  const title = document.getElementById("dp-title");
+  title.textContent = it.pieza || "";
+  title.onblur = () => { if (title.textContent.trim() !== it.pieza) savePieza({ pieza: title.textContent.trim() }); };
+
+  // --- meta editable: canal, formato (dependiente del canal), estado, prioridad, fecha, producción ---
+  const canal = it.canal || "Instagram";
+  const formatosDisponibles = FORMATOS_POR_CANAL[canal] || FORMATOS_POR_CANAL["Otro"];
+  const metaEl = document.getElementById("dp-meta-edit");
+  metaEl.innerHTML =
+    '<select id="dp-f-canal">' + CANALES.map(c => '<option value="' + c + '"' + (c===canal?" selected":"") + '>' + c + '</option>').join("") + '</select>' +
+    '<select id="dp-f-formato">' + formatosDisponibles.map(f => '<option value="' + f + '"' + (f===it.formato?" selected":"") + '>' + f + '</option>').join("") + '</select>' +
+    '<select id="dp-f-estado">' + ESTADO_FLOW.map(e => '<option value="' + e.label + '"' + (e.label===it.estado?" selected":"") + '>' + e.label + '</option>').join("") + '</select>' +
+    '<select id="dp-f-prioridad">' + Object.keys(PRIORIDAD_CLASS).map(p => '<option value="' + p + '"' + (p===it.prioridad?" selected":"") + '>' + p + '</option>').join("") + '</select>' +
+    '<input type="date" id="dp-f-fecha" value="' + (it.fechaISO||"") + '">';
+
+  document.getElementById("dp-f-canal").onchange = (e) => {
+    const nuevosFormatos = FORMATOS_POR_CANAL[e.target.value] || FORMATOS_POR_CANAL["Otro"];
+    savePieza({ canal: e.target.value, formato: nuevosFormatos[0] });
+    openDetail(id); // re-render para refrescar el <select> de formato dependiente
+  };
+  document.getElementById("dp-f-formato").onchange = (e) => savePieza({ formato: e.target.value });
+  document.getElementById("dp-f-estado").onchange = (e) => savePieza({ estado: e.target.value });
+  document.getElementById("dp-f-prioridad").onchange = (e) => savePieza({ prioridad: e.target.value });
+  document.getElementById("dp-f-fecha").onchange = (e) => savePieza({ fechaISO: e.target.value });
+
+  const objEl = document.getElementById("dp-obj");
+  objEl.textContent = (it.objetivo||[]).join(", ");
+  objEl.onblur = () => savePieza({ objetivo: objEl.textContent.split(",").map(s => s.trim()).filter(Boolean) });
+
+  // --- cuerpo: campos de texto largo, todos editables ---
+  const camposLargos = [
+    ["hook", "Hook"], ["idea", "Idea"], ["concepto", "Concepto / desarrollo"],
+    ["guion", "Guion / copy (resumen)"], ["caption", "Caption"], ["cta", "CTA"],
+    ["conversacion", "Conversación que buscamos"], ["material", "Material necesario"],
+    ["notas", "Notas de dirección creativa"]
   ];
-  simple.forEach(([label, text]) => { if (text) blocks.push('<div class="dp-block"><p class="dp-label">' + label + '</p><p class="dp-text">' + text + '</p></div>'); });
+  const body = document.getElementById("dp-body");
+  body.innerHTML = camposLargos.map(([field, label]) => (
+    '<div class="dp-block"><p class="dp-label">' + label + '</p>' +
+    '<textarea class="dp-field-text" data-field="' + field + '" rows="2">' + (it[field]||"") + '</textarea></div>'
+  )).join("") +
+  '<hr class="dp-divider">' +
+  '<p class="dp-ficha-title">Guion estructurado</p>' +
+  '<div id="dp-guion-editor"></div>' +
+  '<button class="dp-add-block-btn" id="dp-open-guion-btn">✎ Abrir editor de guion por escenas</button>' +
+  '<hr class="dp-divider">' +
+  '<p class="dp-ficha-title">Imágenes de referencia</p>' +
+  '<div class="dp-attach-grid" id="dp-img-grid"></div>' +
+  '<hr class="dp-divider">' +
+  '<p class="dp-ficha-title">Links de referencia</p>' +
+  '<div id="dp-links-list"></div>' +
+  '<div class="dp-link-add-row"><input type="text" id="dp-link-input" placeholder="https://..."><button id="dp-link-add-btn">Agregar</button></div>';
 
-  if (it.ficha && it.ficha.length) {
-    blocks.push('<hr class="dp-divider"><p class="dp-ficha-title">Ficha de ejecución / producción</p>');
-    it.ficha.forEach(f => blocks.push('<div class="dp-ficha-item"><p class="dp-label">' + f.label + '</p><p class="dp-text">' + f.text + '</p></div>'));
-  }
-  document.getElementById("dp-body").innerHTML = blocks.join("");
+  body.querySelectorAll(".dp-field-text").forEach(ta => {
+    ta.addEventListener("input", () => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; });
+    ta.dispatchEvent(new Event("input"));
+    ta.addEventListener("blur", () => {
+      const field = ta.dataset.field;
+      if (ta.value !== (it[field]||"")) savePieza({ [field]: ta.value });
+    });
+  });
+
+  renderImgGrid(it);
+  renderLinksList(it);
+  document.getElementById("dp-link-add-btn").addEventListener("click", () => addLinkRef(it));
+  document.getElementById("dp-link-input").addEventListener("keydown", (e) => { if (e.key === "Enter") addLinkRef(it); });
+  document.getElementById("dp-open-guion-btn").addEventListener("click", () => openGuionEditor(it));
+
   document.getElementById("overlay").classList.add("open");
   document.getElementById("detail-panel").classList.add("open");
 }
+
+function renderImgGrid(it) {
+  const grid = document.getElementById("dp-img-grid");
+  if (!grid) return;
+  const imgs = it.imagenesRef || [];
+  grid.innerHTML = imgs.map((url, i) => (
+    '<div class="dp-attach-img"><img src="' + url + '"><button class="dp-attach-remove" data-i="' + i + '">×</button></div>'
+  )).join("") + '<label class="dp-attach-add" id="dp-attach-add-label">+<input type="file" accept="image/*" id="dp-attach-input" style="display:none;"></label>';
+
+  grid.querySelectorAll(".dp-attach-remove").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const nuevas = imgs.filter((_, i) => i !== Number(btn.dataset.i));
+      savePieza({ imagenesRef: nuevas });
+      it.imagenesRef = nuevas;
+      renderImgGrid(it);
+    });
+  });
+  document.getElementById("dp-attach-input").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const url = await sgUploadImage(file, "piezas/" + dpCurrentId);
+      const nuevas = (it.imagenesRef || []).concat(url);
+      await savePieza({ imagenesRef: nuevas });
+      it.imagenesRef = nuevas;
+      renderImgGrid(it);
+    } catch (err) {
+      console.error("upload error", err);
+      alert("No se pudo subir la imagen.");
+    }
+  });
+}
+
+function renderLinksList(it) {
+  const list = document.getElementById("dp-links-list");
+  if (!list) return;
+  const links = it.linksRef || [];
+  list.innerHTML = links.map((url, i) => (
+    '<div class="dp-link-row"><a href="' + url + '" target="_blank" rel="noopener">' + url + '</a><button class="dp-link-remove" data-i="' + i + '">×</button></div>'
+  )).join("");
+  list.querySelectorAll(".dp-link-remove").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const nuevos = links.filter((_, i) => i !== Number(btn.dataset.i));
+      savePieza({ linksRef: nuevos });
+      it.linksRef = nuevos;
+      renderLinksList(it);
+    });
+  });
+}
+function addLinkRef(it) {
+  const input = document.getElementById("dp-link-input");
+  const url = input.value.trim();
+  if (!url) return;
+  const nuevos = (it.linksRef || []).concat(url.indexOf("http") === 0 ? url : "https://" + url);
+  savePieza({ linksRef: nuevos });
+  it.linksRef = nuevos;
+  input.value = "";
+  renderLinksList(it);
+}
+
+async function deletePiezaActual() {
+  if (!dpCurrentId || !currentMesId) return;
+  if (!confirm("¿Eliminar esta pieza de la parrilla? Esta acción no se puede deshacer.")) return;
+  await claudeDb.doc("meses/" + currentMesId + "/piezas/" + dpCurrentId).delete();
+  closeDetail();
+}
+
+/* ---------------- editor de guion estructurado (estilo Reels/Edits) ---------------- */
+// Cada escena: tiempo en pantalla, qué se ve (visual), texto en pantalla, y
+// audio/sonido — el mismo desglose que usa un editor de video corto real.
+function nuevaEscenaVacia() {
+  return { tiempo: "", visual: "", textoPantalla: "", audio: "" };
+}
+
+function openGuionEditor(it) {
+  let overlay = document.getElementById("guion-modal-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.className = "gw-modal-overlay";
+    overlay.id = "guion-modal-overlay";
+    overlay.innerHTML =
+      '<div class="gw-modal" style="max-width:720px;">' +
+        '<button class="gw-modal-close" id="guion-modal-close">×</button>' +
+        '<h3>Guion por escenas</h3>' +
+        '<p class="gw-hint">Desglosa el video escena por escena: qué se ve, qué dice el texto en pantalla, y qué se escucha.</p>' +
+        '<div id="guion-escenas-list"></div>' +
+        '<button class="dp-add-block-btn" id="guion-add-escena-btn">+ Agregar escena</button>' +
+        '<button class="empty-btn" id="guion-save-btn" style="width:100%; margin-top:1.2rem;">Guardar guion</button>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.classList.remove("open"); });
+    document.getElementById("guion-modal-close").addEventListener("click", () => overlay.classList.remove("open"));
+  }
+
+  let escenas = (it.guionEscenas && it.guionEscenas.length) ? JSON.parse(JSON.stringify(it.guionEscenas)) : [nuevaEscenaVacia()];
+
+  function renderEscenas() {
+    const list = document.getElementById("guion-escenas-list");
+    list.innerHTML = escenas.map((esc, i) => (
+      '<div class="dp-block" style="border:1px solid var(--line); border-radius:10px; padding:0.9rem; margin-bottom:0.8rem;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">' +
+          '<strong style="font-size:0.85rem;">Escena ' + (i+1) + '</strong>' +
+          (escenas.length > 1 ? '<button class="dp-link-remove" data-i="' + i + '" data-action="remove-escena">Eliminar</button>' : '') +
+        '</div>' +
+        '<div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">' +
+          '<div><label class="dp-label">Tiempo (ej: 0-2s)</label><input type="text" class="gw-field-input" data-i="' + i + '" data-field="tiempo" value="' + escapeHtml(esc.tiempo) + '" style="width:100%; padding:0.4rem 0.6rem; border-radius:6px; border:1px solid var(--linen-warm); font-family:inherit;"></div>' +
+          '<div><label class="dp-label">Audio / sonido</label><input type="text" class="gw-field-input" data-i="' + i + '" data-field="audio" value="' + escapeHtml(esc.audio) + '" style="width:100%; padding:0.4rem 0.6rem; border-radius:6px; border:1px solid var(--linen-warm); font-family:inherit;"></div>' +
+        '</div>' +
+        '<label class="dp-label" style="margin-top:0.5rem; display:block;">Qué se ve (visual)</label>' +
+        '<textarea class="gw-field-input" data-i="' + i + '" data-field="visual" rows="2" style="width:100%; padding:0.4rem 0.6rem; border-radius:6px; border:1px solid var(--linen-warm); font-family:inherit; resize:vertical;">' + escapeHtml(esc.visual) + '</textarea>' +
+        '<label class="dp-label" style="margin-top:0.5rem; display:block;">Texto en pantalla</label>' +
+        '<textarea class="gw-field-input" data-i="' + i + '" data-field="textoPantalla" rows="1" style="width:100%; padding:0.4rem 0.6rem; border-radius:6px; border:1px solid var(--linen-warm); font-family:inherit; resize:vertical;">' + escapeHtml(esc.textoPantalla) + '</textarea>' +
+      '</div>'
+    )).join("");
+
+    list.querySelectorAll(".gw-field-input").forEach(inp => {
+      inp.addEventListener("input", () => { escenas[Number(inp.dataset.i)][inp.dataset.field] = inp.value; });
+    });
+    list.querySelectorAll('[data-action="remove-escena"]').forEach(btn => {
+      btn.addEventListener("click", () => { escenas.splice(Number(btn.dataset.i), 1); renderEscenas(); });
+    });
+  }
+  renderEscenas();
+
+  document.getElementById("guion-add-escena-btn").onclick = () => { escenas.push(nuevaEscenaVacia()); renderEscenas(); };
+  document.getElementById("guion-save-btn").onclick = async () => {
+    await savePieza({ guionEscenas: escenas });
+    it.guionEscenas = escenas;
+    overlay.classList.remove("open");
+  };
+
+  overlay.classList.add("open");
+}
+
 function closeDetail() {
   document.getElementById("overlay").classList.remove("open");
   document.getElementById("detail-panel").classList.remove("open");
+  dpCurrentId = null;
 }
 document.getElementById("overlay").addEventListener("click", closeDetail);
 document.getElementById("dp-close").addEventListener("click", closeDetail);
+document.getElementById("dp-delete").addEventListener("click", deletePiezaActual);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDetail(); });
 
 /* ---------------- tabs ---------------- */
