@@ -762,6 +762,30 @@ body.sg-gate-open { overflow: hidden; }
 .gw-head .gw-back { background: transparent; border:none; color:#C9C1B2; font-size:0.82rem; margin-bottom: 0.8rem; padding:0; }
 .gw-head h2 { font-family:'Fraunces', serif; font-size: clamp(1.6rem,4vw,2.4rem); margin: 0 0 0.6rem; color: var(--white, #fff); }
 .gw-head .sg-card-tag { margin-right: 0.5rem; }
+.color-dot-btn { background:none; border:1px solid rgba(239,232,218,0.3); border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.color-dot { width:16px; height:16px; border-radius:50%; display:block; background: var(--proj-accent, #6C4FD6); }
+.color-swatch-grid { display:grid; grid-template-columns: repeat(6, 1fr); gap:0.6rem; }
+.color-swatch { width:100%; aspect-ratio:1; border-radius:50%; border:2px solid transparent; cursor:pointer; }
+.color-swatch.selected { border-color: var(--ink); }
+
+/* --- tablero de brainstorming libre (estilo Miro/FigJam) --- */
+.tablero-toolbar { display:flex; align-items:center; gap:0.6rem; padding:0.8rem 1rem; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+.tablero-zoom-btn { background:var(--linen); border:1px solid var(--line); border-radius:6px; width:30px; height:30px; font-size:1rem; color:var(--ink); }
+.tablero-zoom-label { font-size:0.8rem; color:var(--ink-soft); min-width:3.2em; text-align:center; }
+.tablero-viewport { position:relative; width:100%; height:70vh; overflow:hidden; background:
+    linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px),
+    linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px);
+  background-size: 28px 28px; background-color:#FBF8F2; cursor:grab; border-radius:0 0 12px 12px; }
+.tablero-viewport:active { cursor:grabbing; }
+.tablero-canvas { position:absolute; top:0; left:0; width:1px; height:1px; transform-origin: 0 0; }
+.tablero-item { position:absolute; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.12); cursor:grab; }
+.tablero-item.dragging { cursor:grabbing; box-shadow:0 8px 22px rgba(0,0,0,0.22); z-index:50; }
+.tablero-nota { padding:0.7rem; }
+.tablero-nota-text { width:100%; height:100%; border:none; background:transparent; resize:none; font-family:'Poppins', sans-serif; font-size:0.82rem; color:#3a3326; outline:none; }
+.tablero-img { overflow:hidden; background:#fff; border:1px solid var(--line); }
+.tablero-img img { width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; }
+.tablero-item-del { position:absolute; top:-8px; right:-8px; width:22px; height:22px; border-radius:50%; background:#2A2827; color:#fff; border:none; font-size:0.8rem; line-height:1; opacity:0; transition:opacity 0.15s; }
+.tablero-item:hover .tablero-item-del { opacity:1; }
 .gw-tabs { display:flex; gap:0.5rem; margin-top: 1.2rem; flex-wrap:wrap; }
 .gw-tab-btn { background: rgba(240,235,226,0.1); border:1px solid rgba(240,235,226,0.25); color:#D8D2C4; border-radius:999px; padding:0.45rem 1rem; font-size:0.8rem; font-weight:500; }
 .gw-tab-btn.active { background: var(--sg-orange); border-color: var(--sg-orange); color: #fff; }
@@ -2392,10 +2416,26 @@ initCapabilities();
   <div class="gw-head">
     <button class="gw-back" id="gw-back-btn">← Proyectos</button>
     <span class="sg-card-tag" id="gw-head-tag"></span>
-    <h2 id="gw-head-title"></h2>
+    <div style="display:flex; align-items:center; gap:0.6rem;">
+      <h2 id="gw-head-title" style="margin:0;"></h2>
+      <button class="color-dot-btn" id="gw-color-btn" title="Color del proyecto"><span id="gw-color-dot" class="color-dot"></span></button>
+    </div>
     <div class="gw-tabs" id="gw-tabs"></div>
   </div>
   <div class="gw-panel" id="gw-panel"></div>
+</div>
+
+<div class="gw-modal-overlay" id="color-modal-overlay">
+  <div class="gw-modal" style="max-width:380px;">
+    <button class="gw-modal-close" id="color-modal-close">×</button>
+    <h3>Color del proyecto</h3>
+    <p class="gw-hint">Define el acento visual de este proyecto en toda la plataforma.</p>
+    <div class="color-swatch-grid" id="color-swatch-grid"></div>
+    <div class="gw-field" style="margin-top:1rem;">
+      <label>O elige un color personalizado</label>
+      <input type="color" id="color-custom-input" style="width:100%; height:44px; border-radius:8px; border:1px solid var(--linen-warm); cursor:pointer;">
+    </div>
+  </div>
 </div>
 
 <div class="overlay" id="gw-overlay"></div>
@@ -2529,11 +2569,11 @@ function fechaDisplay(iso){ if(!iso) return ""; const [y,m,d]=iso.split("-"); re
 
 const TIPO_LABEL = { llovizna:"Llovizna", lluvia:"Lluvia", tormenta:"Tormenta" };
 const TIPO_TABS = {
-  llovizna: ["referencias","ideas","chat"],
-  lluvia: ["campana","parrilla","chat"],
-  tormenta: ["biblia","parrilla","chat"]
+  llovizna: ["referencias","ideas","tablero","chat"],
+  lluvia: ["campana","parrilla","tablero","chat"],
+  tormenta: ["biblia","parrilla","tablero","chat"]
 };
-const TAB_LABEL = { referencias:"Referencias", ideas:"Ideas", campana:"Campaña", parrilla:"Parrilla", biblia:"Biblia", chat:"Estudio IA" };
+const TAB_LABEL = { referencias:"Referencias", ideas:"Ideas", campana:"Campaña", parrilla:"Parrilla", biblia:"Biblia", tablero:"Tablero", chat:"Estudio IA" };
 
 /* ---------------- projects grid on hub ---------------- */
 let unsubProjects = null;
@@ -2767,11 +2807,39 @@ function applyCustomFont() {
   }
 }
 
+const PROJECT_COLORS = ["#6C4FD6", "#C0392B", "#1A7A42", "#1A5DAD", "#B6481B", "#A8661A", "#5B3FA6", "#B3246B", "#1C9E8C", "#4A4A4A", "#8C6D00", "#2E7D8C"];
+
 function renderHead() {
   document.getElementById("gw-head-tag").className = "sg-card-tag " + currentProject.tipo;
   document.getElementById("gw-head-tag").textContent = TIPO_LABEL[currentProject.tipo];
   document.getElementById("gw-head-title").textContent = currentProject.nombre;
+  const accent = currentProject.color || PROJECT_COLORS[0];
+  document.documentElement.style.setProperty("--proj-accent", accent);
 }
+
+function openColorModal() {
+  const overlay = document.getElementById("color-modal-overlay");
+  const grid = document.getElementById("color-swatch-grid");
+  const current = currentProject.color || PROJECT_COLORS[0];
+  grid.innerHTML = PROJECT_COLORS.map(c =>
+    '<button class="color-swatch' + (c===current?" selected":"") + '" style="background:' + c + '" data-color="' + c + '"></button>'
+  ).join("");
+  grid.querySelectorAll(".color-swatch").forEach(btn => {
+    btn.addEventListener("click", () => setProjectColor(btn.dataset.color));
+  });
+  document.getElementById("color-custom-input").value = current;
+  document.getElementById("color-custom-input").oninput = (e) => setProjectColor(e.target.value);
+  overlay.classList.add("open");
+}
+async function setProjectColor(color) {
+  currentProject.color = color;
+  document.documentElement.style.setProperty("--proj-accent", color);
+  await gDb.doc("proyectos/" + currentProject.id).set(Object.assign({}, currentProject));
+  document.getElementById("color-modal-overlay").classList.remove("open");
+}
+document.getElementById("gw-color-btn").addEventListener("click", openColorModal);
+document.getElementById("color-modal-close").addEventListener("click", () => document.getElementById("color-modal-overlay").classList.remove("open"));
+document.getElementById("color-modal-overlay").addEventListener("click", (e) => { if (e.target.id === "color-modal-overlay") e.target.classList.remove("open"); });
 
 let gwActiveTab = null;
 function renderTabs() {
@@ -2789,6 +2857,7 @@ function renderPanel() {
   if (gwActiveTab === "referencias") return renderReferenciasTab(panel);
   if (gwActiveTab === "ideas") return renderIdeasTab(panel);
   if (gwActiveTab === "parrilla") return renderParrillaTab(panel);
+  if (gwActiveTab === "tablero") return renderTableroTab(panel);
   if (gwActiveTab === "chat") return renderChatTab(panel);
 }
 
@@ -3122,6 +3191,165 @@ function gwToolDefs() {
     });
   }
   return tools;
+}
+
+/* ---------------- TABLERO (brainstorming libre, estilo Miro/FigJam) ---------------- */
+let gwTableroItems = [];
+let gwUnsubTablero = null;
+let gwTableroScale = 1;
+let gwTableroPan = { x: 0, y: 0 };
+
+function renderTableroTab(panel) {
+  panel.innerHTML =
+    '<div class="tablero-toolbar">' +
+      '<button class="empty-btn" id="tablero-add-note">+ Nota</button>' +
+      '<label class="empty-btn" id="tablero-add-img-label" style="cursor:pointer;">+ Imagen<input type="file" accept="image/*" id="tablero-add-img-input" style="display:none;"></label>' +
+      '<button class="tablero-zoom-btn" id="tablero-zoom-out">−</button>' +
+      '<span class="tablero-zoom-label" id="tablero-zoom-label">100%</span>' +
+      '<button class="tablero-zoom-btn" id="tablero-zoom-in">+</button>' +
+      '<button class="tablero-zoom-btn" id="tablero-zoom-reset" title="Centrar vista">⤾</button>' +
+    '</div>' +
+    '<div class="tablero-viewport" id="tablero-viewport">' +
+      '<div class="tablero-canvas" id="tablero-canvas"></div>' +
+    '</div>';
+
+  gwTableroScale = 1; gwTableroPan = { x: 0, y: 0 };
+  document.getElementById("tablero-add-note").addEventListener("click", () => tableroAddItem("nota"));
+  document.getElementById("tablero-add-img-input").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (file) tableroAddImage(file);
+  });
+  document.getElementById("tablero-zoom-in").addEventListener("click", () => tableroZoom(0.1));
+  document.getElementById("tablero-zoom-out").addEventListener("click", () => tableroZoom(-0.1));
+  document.getElementById("tablero-zoom-reset").addEventListener("click", () => { gwTableroScale = 1; gwTableroPan = {x:0,y:0}; applyTableroTransform(); });
+
+  setupTableroPan();
+
+  if (gwUnsubTablero) gwUnsubTablero();
+  gwUnsubTablero = gDb.collection("proyectos/" + currentProjectId + "/tablero").onSnapshot((snap) => {
+    gwTableroItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderTableroItems();
+  });
+}
+
+function tableroZoom(delta) {
+  gwTableroScale = Math.max(0.3, Math.min(2.5, gwTableroScale + delta));
+  document.getElementById("tablero-zoom-label").textContent = Math.round(gwTableroScale * 100) + "%";
+  applyTableroTransform();
+}
+function applyTableroTransform() {
+  const canvas = document.getElementById("tablero-canvas");
+  if (!canvas) return;
+  canvas.style.transform = "translate(" + gwTableroPan.x + "px," + gwTableroPan.y + "px) scale(" + gwTableroScale + ")";
+}
+
+function setupTableroPan() {
+  const viewport = document.getElementById("tablero-viewport");
+  let panning = false, startX = 0, startY = 0, origPan = {x:0,y:0};
+  viewport.addEventListener("mousedown", (e) => {
+    if (e.target !== viewport && e.target.id !== "tablero-canvas") return; // no interferir con drag de notas
+    panning = true; startX = e.clientX; startY = e.clientY; origPan = {...gwTableroPan};
+    viewport.style.cursor = "grabbing";
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!panning) return;
+    gwTableroPan.x = origPan.x + (e.clientX - startX);
+    gwTableroPan.y = origPan.y + (e.clientY - startY);
+    applyTableroTransform();
+  });
+  window.addEventListener("mouseup", () => { panning = false; viewport.style.cursor = "grab"; });
+  viewport.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    tableroZoom(e.deltaY < 0 ? 0.08 : -0.08);
+  }, { passive: false });
+}
+
+const NOTE_COLORS = ["#FFF3B0", "#FFD6E8", "#D4F4DD", "#D6E8FF", "#E8D6FF", "#FFE0C7"];
+
+async function tableroAddItem(tipo) {
+  const viewport = document.getElementById("tablero-viewport");
+  const rect = viewport.getBoundingClientRect();
+  // posiciona la nueva nota cerca del centro visible del lienzo, en coordenadas del canvas
+  const x = (rect.width/2 - gwTableroPan.x) / gwTableroScale - 90;
+  const y = (rect.height/2 - gwTableroPan.y) / gwTableroScale - 70;
+  await gDb.collection("proyectos/" + currentProjectId + "/tablero").add({
+    tipo: "nota", texto: "", color: NOTE_COLORS[Math.floor(Math.random()*NOTE_COLORS.length)],
+    x, y, w: 180, h: 140, createdAt: new Date().toISOString()
+  });
+}
+
+async function tableroAddImage(file) {
+  const url = await sgUploadImage(file, "tablero/" + currentProjectId);
+  const viewport = document.getElementById("tablero-viewport");
+  const rect = viewport.getBoundingClientRect();
+  const x = (rect.width/2 - gwTableroPan.x) / gwTableroScale - 110;
+  const y = (rect.height/2 - gwTableroPan.y) / gwTableroScale - 90;
+  await gDb.collection("proyectos/" + currentProjectId + "/tablero").add({
+    tipo: "imagen", url, x, y, w: 220, h: 180, createdAt: new Date().toISOString()
+  });
+}
+
+function renderTableroItems() {
+  const canvas = document.getElementById("tablero-canvas");
+  if (!canvas) return;
+  canvas.innerHTML = gwTableroItems.map(it => {
+    if (it.tipo === "imagen") {
+      return '<div class="tablero-item tablero-img" data-id="' + it.id + '" style="left:' + it.x + 'px; top:' + it.y + 'px; width:' + it.w + 'px; height:' + it.h + 'px;">' +
+        '<img src="' + it.url + '" draggable="false">' +
+        '<button class="tablero-item-del" data-id="' + it.id + '">×</button>' +
+      '</div>';
+    }
+    return '<div class="tablero-item tablero-nota" data-id="' + it.id + '" style="left:' + it.x + 'px; top:' + it.y + 'px; width:' + it.w + 'px; height:' + it.h + 'px; background:' + (it.color||"#FFF3B0") + ';">' +
+      '<textarea class="tablero-nota-text" data-id="' + it.id + '" placeholder="Escribe una idea...">' + (it.texto||"") + '</textarea>' +
+      '<button class="tablero-item-del" data-id="' + it.id + '">×</button>' +
+    '</div>';
+  }).join("");
+
+  canvas.querySelectorAll(".tablero-item-del").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      gDb.doc("proyectos/" + currentProjectId + "/tablero/" + btn.dataset.id).delete();
+    });
+  });
+  canvas.querySelectorAll(".tablero-nota-text").forEach(ta => {
+    ta.addEventListener("blur", () => {
+      const it = gwTableroItems.find(x => x.id === ta.dataset.id);
+      if (it && ta.value !== it.texto) {
+        gDb.doc("proyectos/" + currentProjectId + "/tablero/" + ta.dataset.id).set(Object.assign({}, it, { texto: ta.value }));
+      }
+    });
+  });
+  canvas.querySelectorAll(".tablero-item").forEach(el => setupItemDrag(el));
+}
+
+function setupItemDrag(el) {
+  let dragging = false, startX = 0, startY = 0, origX = 0, origY = 0;
+  el.addEventListener("mousedown", (e) => {
+    if (e.target.tagName === "TEXTAREA" || e.target.classList.contains("tablero-item-del")) return;
+    dragging = true;
+    startX = e.clientX; startY = e.clientY;
+    origX = parseFloat(el.style.left); origY = parseFloat(el.style.top);
+    el.classList.add("dragging");
+    e.stopPropagation(); // no mover el lienzo mientras se arrastra una nota
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    const dx = (e.clientX - startX) / gwTableroScale;
+    const dy = (e.clientY - startY) / gwTableroScale;
+    el.style.left = (origX + dx) + "px";
+    el.style.top = (origY + dy) + "px";
+  });
+  window.addEventListener("mouseup", () => {
+    if (!dragging) return;
+    dragging = false;
+    el.classList.remove("dragging");
+    const id = el.dataset.id;
+    const it = gwTableroItems.find(x => x.id === id);
+    if (it) {
+      const newX = parseFloat(el.style.left), newY = parseFloat(el.style.top);
+      gDb.doc("proyectos/" + currentProjectId + "/tablero/" + id).set(Object.assign({}, it, { x: newX, y: newY }));
+    }
+  });
 }
 
 function renderChatTab(panel) {
