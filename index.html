@@ -789,6 +789,14 @@ body.sg-gate-open { overflow: hidden; }
 .tablero-img img { width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; }
 .tablero-item-del { position:absolute; top:-8px; right:-8px; width:22px; height:22px; border-radius:50%; background:#2A2827; color:#fff; border:none; font-size:0.8rem; line-height:1; opacity:0; transition:opacity 0.15s; }
 .tablero-item:hover .tablero-item-del { opacity:1; }
+.tablero-item.selected { outline: 3px solid #6C4FD6; outline-offset: 2px; }
+.tablero-img-loading { position:absolute; inset:0; background:rgba(255,255,255,0.75); display:flex; align-items:center; justify-content:center; }
+/* --- barra de IA del tablero (estilo Mixboard: prompt flotante abajo) --- */
+.fb-ai-bar { position:relative; display:flex; align-items:center; gap:0.7rem; padding:0.8rem 1rem; border-top:1px solid var(--line); background: var(--white); border-radius:0 0 12px 12px; }
+.fb-ai-selection-tag { display:none; background:#EDE7FB; color:#5B3FA6; font-size:0.74rem; font-weight:600; padding:0.3rem 0.7rem; border-radius:999px; white-space:nowrap; }
+.fb-ai-bar input[type="text"] { flex:1; border:1px solid var(--line); border-radius:999px; padding:0.6rem 1rem; font-family:inherit; font-size:0.88rem; }
+.fb-ai-send { background: var(--slate); color:#fff; border:none; border-radius:999px; padding:0.6rem 1.2rem; font-size:0.85rem; font-weight:600; white-space:nowrap; }
+.fb-ai-send:disabled { opacity:0.5; }
 .gw-tabs { display:flex; gap:0.5rem; margin-top: 1.2rem; flex-wrap:wrap; }
 .gw-tab-btn { background: rgba(240,235,226,0.1); border:1px solid rgba(240,235,226,0.25); color:#D8D2C4; border-radius:999px; padding:0.45rem 1rem; font-size:0.8rem; font-weight:500; }
 .gw-tab-btn.active { background: var(--sg-orange); border-color: var(--sg-orange); color: #fff; }
@@ -1876,18 +1884,19 @@ async function crearPiezaNuevaYAbrir() {
    sus items, para poder usarse tanto en la Parrilla principal (por mes) como
    dentro de un proyecto — sin duplicar esta lógica en los dos lugares. */
 const FREEBOARD_NOTE_COLORS = ["#FFF3B0", "#FFD6E8", "#D4F4DD", "#D6E8FF", "#E8D6FF", "#FFE0C7"];
-let fbState = { items: [], unsub: null, scale: 1, pan: {x:0,y:0}, path: null };
+let fbState = { items: [], unsub: null, scale: 1, pan: {x:0,y:0}, path: null, selected: [] };
 
 function renderFreeboard(containerId, firestorePath) {
   const container = document.getElementById(containerId);
   if (!container) return;
   fbState.path = firestorePath;
   fbState.scale = 1; fbState.pan = {x:0, y:0};
+  fbState.selected = []; // ids de bloques seleccionados (para editar/combinar con IA)
 
   container.innerHTML =
     '<div class="tablero-toolbar">' +
       '<button class="empty-btn" id="fb-add-note">+ Nota</button>' +
-      '<label class="empty-btn" id="fb-add-img-label" style="cursor:pointer;">+ Imagen<input type="file" accept="image/*" id="fb-add-img-input" style="display:none;"></label>' +
+      '<label class="empty-btn" id="fb-add-img-label" style="cursor:pointer;">+ Imagen propia<input type="file" accept="image/*" id="fb-add-img-input" style="display:none;"></label>' +
       '<button class="tablero-zoom-btn" id="fb-zoom-out">−</button>' +
       '<span class="tablero-zoom-label" id="fb-zoom-label">100%</span>' +
       '<button class="tablero-zoom-btn" id="fb-zoom-in">+</button>' +
@@ -1895,6 +1904,11 @@ function renderFreeboard(containerId, firestorePath) {
     '</div>' +
     '<div class="tablero-viewport" id="fb-viewport">' +
       '<div class="tablero-canvas" id="fb-canvas"></div>' +
+    '</div>' +
+    '<div class="fb-ai-bar">' +
+      '<span class="fb-ai-selection-tag" id="fb-ai-selection-tag"></span>' +
+      '<input type="text" id="fb-ai-prompt" placeholder="Describe una imagen para generar, o pide ideas sobre lo seleccionado...">' +
+      '<button class="fb-ai-send" id="fb-ai-send">✨ Generar</button>' +
     '</div>';
 
   document.getElementById("fb-add-note").addEventListener("click", () => freeboardAddNote());
@@ -1905,8 +1919,11 @@ function renderFreeboard(containerId, firestorePath) {
   document.getElementById("fb-zoom-in").addEventListener("click", () => freeboardZoom(0.1));
   document.getElementById("fb-zoom-out").addEventListener("click", () => freeboardZoom(-0.1));
   document.getElementById("fb-zoom-reset").addEventListener("click", () => { fbState.scale = 1; fbState.pan = {x:0,y:0}; freeboardApplyTransform(); });
+  document.getElementById("fb-ai-send").addEventListener("click", () => freeboardAiSubmit());
+  document.getElementById("fb-ai-prompt").addEventListener("keydown", (e) => { if (e.key === "Enter") freeboardAiSubmit(); });
 
   freeboardSetupPan();
+  freeboardUpdateSelectionTag();
 
   if (fbState.unsub) fbState.unsub();
   fbState.unsub = claudeDb.collection(firestorePath).onSnapshot((snap) => {
@@ -1972,13 +1989,16 @@ function freeboardRenderItems() {
   const canvas = document.getElementById("fb-canvas");
   if (!canvas) return;
   canvas.innerHTML = fbState.items.map(it => {
+    const isSelected = fbState.selected.includes(it.id);
+    const selClass = isSelected ? " selected" : "";
     if (it.tipo === "imagen") {
-      return '<div class="tablero-item tablero-img" data-id="' + it.id + '" style="left:' + it.x + 'px; top:' + it.y + 'px; width:' + it.w + 'px; height:' + it.h + 'px;">' +
-        '<img src="' + it.url + '" draggable="false">' +
+      const loadingOverlay = it.generando ? '<div class="tablero-img-loading"><span class="spin"></span></div>' : "";
+      return '<div class="tablero-item tablero-img' + selClass + '" data-id="' + it.id + '" style="left:' + it.x + 'px; top:' + it.y + 'px; width:' + it.w + 'px; height:' + it.h + 'px;">' +
+        '<img src="' + (it.url||"") + '" draggable="false">' + loadingOverlay +
         '<button class="tablero-item-del" data-id="' + it.id + '">×</button>' +
       '</div>';
     }
-    return '<div class="tablero-item tablero-nota" data-id="' + it.id + '" style="left:' + it.x + 'px; top:' + it.y + 'px; width:' + it.w + 'px; height:' + it.h + 'px; background:' + (it.color||"#FFF3B0") + ';">' +
+    return '<div class="tablero-item tablero-nota' + selClass + '" data-id="' + it.id + '" style="left:' + it.x + 'px; top:' + it.y + 'px; width:' + it.w + 'px; height:' + it.h + 'px; background:' + (it.color||"#FFF3B0") + ';">' +
       '<textarea class="tablero-nota-text" data-id="' + it.id + '" placeholder="Escribe una idea...">' + (it.texto||"") + '</textarea>' +
       '<button class="tablero-item-del" data-id="' + it.id + '">×</button>' +
     '</div>';
@@ -1988,6 +2008,8 @@ function freeboardRenderItems() {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       claudeDb.doc(fbState.path + "/" + btn.dataset.id).delete();
+      fbState.selected = fbState.selected.filter(id => id !== btn.dataset.id);
+      freeboardUpdateSelectionTag();
     });
   });
   canvas.querySelectorAll(".tablero-nota-text").forEach(ta => {
@@ -1998,8 +2020,157 @@ function freeboardRenderItems() {
       }
     });
   });
-  canvas.querySelectorAll(".tablero-item").forEach(el => freeboardSetupItemDrag(el));
+  canvas.querySelectorAll(".tablero-item").forEach(el => {
+    freeboardSetupItemDrag(el);
+    el.addEventListener("click", (e) => {
+      if (e.target.tagName === "TEXTAREA" || e.target.classList.contains("tablero-item-del")) return;
+      const id = el.dataset.id;
+      if (e.shiftKey) {
+        // Shift+clic: añade o quita del grupo seleccionado (selección múltiple)
+        fbState.selected = fbState.selected.includes(id)
+          ? fbState.selected.filter(x => x !== id)
+          : fbState.selected.concat(id);
+      } else {
+        // clic normal: selecciona solo este bloque (o lo deselecciona si ya era el único)
+        fbState.selected = (fbState.selected.length === 1 && fbState.selected[0] === id) ? [] : [id];
+      }
+      freeboardRenderItems();
+      freeboardUpdateSelectionTag();
+    });
+  });
 }
+
+// Actualiza la pastilla sobre la barra de IA que indica qué hay seleccionado,
+// y ajusta el placeholder del prompt según el contexto (0, 1 o varios bloques).
+function freeboardUpdateSelectionTag() {
+  const tag = document.getElementById("fb-ai-selection-tag");
+  const input = document.getElementById("fb-ai-prompt");
+  if (!tag || !input) return;
+  const n = fbState.selected.length;
+  if (n === 0) {
+    tag.textContent = "";
+    tag.style.display = "none";
+    input.placeholder = "Describe una imagen para generar, o pide ideas al Estudio IA sobre todo el tablero...";
+  } else {
+    tag.style.display = "";
+    tag.textContent = n === 1 ? "1 bloque seleccionado" : n + " bloques seleccionados";
+    input.placeholder = n === 1
+      ? "Pide un cambio sobre este bloque (ej: cambia el color a azul)..."
+      : "Pide combinar o comparar estos bloques...";
+  }
+}
+
+// Construye un resumen de texto de todo lo que hay en el tablero (notas e
+// indicación de qué imágenes existen), para dárselo como contexto a Gemini
+// cuando se le pide una idea o análisis — así "lee" el tablero completo.
+function freeboardBuildContext() {
+  const notas = fbState.items.filter(it => it.tipo === "nota" && it.texto && it.texto.trim());
+  const imagenes = fbState.items.filter(it => it.tipo === "imagen");
+  let ctx = "Contenido actual del tablero de brainstorming:\n";
+  if (notas.length) {
+    ctx += notas.map((n, i) => "- Nota " + (i+1) + ": " + n.texto.trim()).join("\n") + "\n";
+  } else {
+    ctx += "- (no hay notas de texto todavía)\n";
+  }
+  ctx += "- Hay " + imagenes.length + " imagen(es) de referencia en el tablero.\n";
+  return ctx;
+}
+
+// Decide qué hacer con lo que el usuario escribió en la barra de IA:
+// - Si hay bloques de IMAGEN seleccionados -> regenera esas imágenes con el prompt (editar/remix, estilo Mixboard).
+// - Si no hay selección o la selección es de notas -> le pide ideas a Gemini usando el tablero como contexto,
+//   y la respuesta aparece como una nota nueva en el lienzo.
+// - Si el texto del prompt suena a pedir una imagen nueva (sin nada seleccionado) -> genera un bloque de imagen.
+async function freeboardAiSubmit() {
+  const input = document.getElementById("fb-ai-prompt");
+  const btn = document.getElementById("fb-ai-send");
+  const prompt = input.value.trim();
+  if (!prompt) return;
+
+  const imagenesSeleccionadas = fbState.items.filter(it => fbState.selected.includes(it.id) && it.tipo === "imagen");
+  const notasSeleccionadas = fbState.items.filter(it => fbState.selected.includes(it.id) && it.tipo === "nota");
+
+  btn.disabled = true;
+  const textoOriginalBtn = btn.textContent;
+  btn.textContent = "Pensando...";
+
+  try {
+    if (imagenesSeleccionadas.length) {
+      // Editar/remezclar imagen(es) seleccionadas, al estilo Mixboard.
+      btn.textContent = "Generando...";
+      for (const img of imagenesSeleccionadas) {
+        await claudeDb.doc(fbState.path + "/" + img.id).set(Object.assign({}, img, { generando: true }));
+      }
+      const promptFinal = imagenesSeleccionadas.length > 1
+        ? "Combina estas referencias visuales según esta instrucción: " + prompt
+        : "Parte de esta imagen de referencia y aplica este cambio: " + prompt;
+      for (const img of imagenesSeleccionadas) {
+        const dataUri = await sgGenerateImage(promptFinal);
+        await claudeDb.doc(fbState.path + "/" + img.id).set(Object.assign({}, img, { url: dataUri, generando: false }));
+      }
+    } else if (notasSeleccionadas.length && /idea|sugerenc|desarrolla|expande|mejora|analiza|combina|resume/i.test(prompt)) {
+      // Pedir a Gemini que trabaje sobre el texto de las notas seleccionadas.
+      const contexto = "Notas seleccionadas por el usuario en el tablero:\n" +
+        notasSeleccionadas.map((n,i) => "- " + n.texto).join("\n");
+      const respuesta = await freeboardAskGemini(contexto + "\n\nPedido del usuario: " + prompt);
+      await freeboardAddNoteWithText(respuesta);
+    } else if (/imagen|foto|diseñ|dibuja|ilustra|genera una|crea una|banner|poster|cartel/i.test(prompt) && !notasSeleccionadas.length) {
+      // El prompt suena a pedir una imagen nueva generada desde cero.
+      await freeboardGenerateNewImageBlock(prompt);
+    } else {
+      // Caso general: pedir ideas o análisis usando TODO el tablero como contexto.
+      const respuesta = await freeboardAskGemini(freeboardBuildContext() + "\n\nPedido del usuario: " + prompt);
+      await freeboardAddNoteWithText(respuesta);
+    }
+    input.value = "";
+  } catch (e) {
+    console.error("freeboardAiSubmit error", e);
+    alert("Algo falló pidiéndole esto a la IA: " + (e.message || "error desconocido"));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = textoOriginalBtn;
+  }
+}
+
+// Llama al chat de Gemini (mismo backend que usa el Estudio IA) con un
+// contexto puntual, sin herramientas ni historial — solo para obtener texto.
+async function freeboardAskGemini(mensaje) {
+  const res = await sgBackendCall({
+    action: "chat",
+    messages: [{ role: "user", content: mensaje }],
+    systemPrompt: "Eres el Estudio Creativo de VOLTA ayudando a pensar sobre un tablero de brainstorming. Responde directo y accionable, en 2-5 líneas o una lista corta — esto se va a pegar como una nota en un tablero visual, no es un documento largo."
+  });
+  return res.text || "No se obtuvo respuesta.";
+}
+
+// Genera un bloque de imagen nuevo a partir de un prompt y lo coloca cerca
+// del centro de la vista actual (igual que freeboardAddImage, pero con
+// contenido generado por IA en vez de un archivo subido).
+async function freeboardGenerateNewImageBlock(prompt) {
+  const viewport = document.getElementById("fb-viewport");
+  const rect = viewport.getBoundingClientRect();
+  const x = (rect.width/2 - fbState.pan.x) / fbState.scale - 110 + (Math.random()*40-20);
+  const y = (rect.height/2 - fbState.pan.y) / fbState.scale - 90 + (Math.random()*40-20);
+  const { id } = await claudeDb.collection(fbState.path).add({
+    tipo: "imagen", url: "", generando: true, x, y, w: 220, h: 180, createdAt: new Date().toISOString()
+  });
+  const dataUri = await sgGenerateImage(prompt);
+  await claudeDb.doc(fbState.path + "/" + id).set({ tipo: "imagen", url: dataUri, generando: false, x, y, w: 220, h: 180, id });
+}
+
+// Agrega una nota nueva al tablero con el texto que devolvió la IA (así
+// "lee el tablero y da ideas" queda visible como un post-it más, editable).
+async function freeboardAddNoteWithText(texto) {
+  const viewport = document.getElementById("fb-viewport");
+  const rect = viewport.getBoundingClientRect();
+  const x = (rect.width/2 - fbState.pan.x) / fbState.scale - 100 + (Math.random()*60-30);
+  const y = (rect.height/2 - fbState.pan.y) / fbState.scale - 80 + (Math.random()*60-30);
+  await claudeDb.collection(fbState.path).add({
+    tipo: "nota", texto: "💡 " + texto, color: "#D6E8FF",
+    x, y, w: 220, h: 170, createdAt: new Date().toISOString()
+  });
+}
+
 function freeboardSetupItemDrag(el) {
   let dragging = false, startX = 0, startY = 0, origX = 0, origY = 0;
   el.addEventListener("mousedown", (e) => {
