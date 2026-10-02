@@ -374,8 +374,11 @@ table.par-table tr:hover td { background: #F3F0FB; }
 .prioridad-espontaneo::before { background: transparent; border: 1px solid var(--slate-deep); }
 
 table.par-table tr.clickable-row { cursor: pointer; }
-.board-card { cursor: pointer; }
+.board-card { cursor: grab; }
 .board-card:hover, table.par-table tr.clickable-row:hover td { background: #F3F0FB; }
+.board-card.dragging-card { opacity:0.4; cursor:grabbing; }
+.bc-drop-zone { min-height: 40px; border-radius:8px; transition: background 0.12s; }
+.bc-drop-zone.drop-hover { background: rgba(108,79,214,0.08); outline: 2px dashed var(--slate-pale); }
 
 .badge-row { display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; margin-top:0.35rem; }
 
@@ -1798,17 +1801,21 @@ function renderParrillaShell() {
         '<button class="chip ' + (currentFilter===p?"active":"") + '" data-filter="' + p + '">' + p + '</button>'
       ).join("") +
     '</div>' +
-    '<div style="display:flex; gap:0.6rem;">' +
+    '<div style="display:flex; gap:0.6rem; align-items:center;">' +
+      '<button class="empty-btn" id="add-pieza-btn" style="padding:0.5rem 1rem;">+ Nueva pieza</button>' +
       '<div class="view-switch">' +
         '<button class="vs-btn ' + (currentMode==="table"?"active":"") + '" data-mode="table">Tabla</button>' +
         '<button class="vs-btn ' + (currentMode==="board"?"active":"") + '" data-mode="board">Tablero</button>' +
+        '<button class="vs-btn ' + (currentMode==="freeboard"?"active":"") + '" data-mode="freeboard">Brainstorm</button>' +
       '</div>' +
     '</div>' +
   '</section>';
 
-  if (!piezasCache.length) {
+  if (currentMode === "freeboard") {
+    html += '<section id="parrilla-freeboard-section"></section>';
+  } else if (!piezasCache.length) {
     const esOctubre = mes && /oct/i.test(mes.id + " " + (mes.label || ""));
-    html += '<div class="empty-state"><p class="script">Esta parrilla está vacía</p><p class="sub">Ve al Estudio IA y pídele que arme el contenido de ' + (mes ? mes.label : "este mes") + '.</p>' +
+    html += '<div class="empty-state"><p class="script">Esta parrilla está vacía</p><p class="sub">Agrega tu primera pieza, o ve al Estudio IA y pídele que arme el contenido de ' + (mes ? mes.label : "este mes") + '.</p>' +
       (esOctubre ? '<button class="empty-btn" id="seed-btn-inline">Cargar plan de Octubre 2026</button>' : '') +
     '</div>';
   } else {
@@ -1832,13 +1839,227 @@ function renderParrillaShell() {
     btn.addEventListener("click", () => { currentMode = btn.dataset.mode; renderParrillaShell(); });
   });
   document.getElementById("seed-btn-inline")?.addEventListener("click", () => seedOctubreEnMes(currentMesId));
+  document.getElementById("add-pieza-btn")?.addEventListener("click", () => crearPiezaNuevaYAbrir());
 
-  if (piezasCache.length) { renderTable(); renderBoard(); }
+  if (currentMode === "freeboard") {
+    renderFreeboard("parrilla-freeboard-section", "meses/" + currentMesId + "/tablero");
+  } else if (piezasCache.length) {
+    renderTable(); renderBoard();
+  }
+}
+
+// Crea una pieza vacía con valores por defecto razonables y abre su panel de
+// detalle de inmediato para que el usuario la complete ahí mismo.
+async function crearPiezaNuevaYAbrir() {
+  if (!currentMesId) return;
+  const col = claudeDb.collection("meses/" + currentMesId + "/piezas");
+  const hoy = new Date().toISOString().slice(0,10);
+  const { id } = await col.add({
+    pieza: "Nueva pieza (sin título)",
+    fechaISO: hoy,
+    canal: "Instagram",
+    formato: FORMATOS_POR_CANAL["Instagram"][0],
+    pilar: "Marca",
+    estado: "Idea",
+    prioridad: "IMPORTANTE",
+    objetivo: [],
+    createdAt: new Date().toISOString()
+  });
+  // espera un instante breve a que el onSnapshot traiga la pieza recién creada
+  // antes de intentar abrir su panel (evita abrir sobre caché vieja).
+  setTimeout(() => openDetail(id), 350);
+}
+
+/* ---------------- TABLERO DE BRAINSTORMING LIBRE (genérico, reutilizable) ----------------
+   Notas e imágenes sueltas posicionadas libremente, tipo Miro/FigJam. Recibe
+   el id del contenedor donde dibujarse y la ruta de Firestore donde guardar
+   sus items, para poder usarse tanto en la Parrilla principal (por mes) como
+   dentro de un proyecto — sin duplicar esta lógica en los dos lugares. */
+const FREEBOARD_NOTE_COLORS = ["#FFF3B0", "#FFD6E8", "#D4F4DD", "#D6E8FF", "#E8D6FF", "#FFE0C7"];
+let fbState = { items: [], unsub: null, scale: 1, pan: {x:0,y:0}, path: null };
+
+function renderFreeboard(containerId, firestorePath) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  fbState.path = firestorePath;
+  fbState.scale = 1; fbState.pan = {x:0, y:0};
+
+  container.innerHTML =
+    '<div class="tablero-toolbar">' +
+      '<button class="empty-btn" id="fb-add-note">+ Nota</button>' +
+      '<label class="empty-btn" id="fb-add-img-label" style="cursor:pointer;">+ Imagen<input type="file" accept="image/*" id="fb-add-img-input" style="display:none;"></label>' +
+      '<button class="tablero-zoom-btn" id="fb-zoom-out">−</button>' +
+      '<span class="tablero-zoom-label" id="fb-zoom-label">100%</span>' +
+      '<button class="tablero-zoom-btn" id="fb-zoom-in">+</button>' +
+      '<button class="tablero-zoom-btn" id="fb-zoom-reset" title="Centrar vista">⤾</button>' +
+    '</div>' +
+    '<div class="tablero-viewport" id="fb-viewport">' +
+      '<div class="tablero-canvas" id="fb-canvas"></div>' +
+    '</div>';
+
+  document.getElementById("fb-add-note").addEventListener("click", () => freeboardAddNote());
+  document.getElementById("fb-add-img-input").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (file) freeboardAddImage(file);
+  });
+  document.getElementById("fb-zoom-in").addEventListener("click", () => freeboardZoom(0.1));
+  document.getElementById("fb-zoom-out").addEventListener("click", () => freeboardZoom(-0.1));
+  document.getElementById("fb-zoom-reset").addEventListener("click", () => { fbState.scale = 1; fbState.pan = {x:0,y:0}; freeboardApplyTransform(); });
+
+  freeboardSetupPan();
+
+  if (fbState.unsub) fbState.unsub();
+  fbState.unsub = claudeDb.collection(firestorePath).onSnapshot((snap) => {
+    fbState.items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    freeboardRenderItems();
+  });
+}
+
+function freeboardZoom(delta) {
+  fbState.scale = Math.max(0.3, Math.min(2.5, fbState.scale + delta));
+  const label = document.getElementById("fb-zoom-label");
+  if (label) label.textContent = Math.round(fbState.scale * 100) + "%";
+  freeboardApplyTransform();
+}
+function freeboardApplyTransform() {
+  const canvas = document.getElementById("fb-canvas");
+  if (!canvas) return;
+  canvas.style.transform = "translate(" + fbState.pan.x + "px," + fbState.pan.y + "px) scale(" + fbState.scale + ")";
+}
+function freeboardSetupPan() {
+  const viewport = document.getElementById("fb-viewport");
+  if (!viewport) return;
+  let panning = false, startX = 0, startY = 0, origPan = {x:0,y:0};
+  viewport.addEventListener("mousedown", (e) => {
+    if (e.target !== viewport && e.target.id !== "fb-canvas") return;
+    panning = true; startX = e.clientX; startY = e.clientY; origPan = {...fbState.pan};
+    viewport.style.cursor = "grabbing";
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!panning) return;
+    fbState.pan.x = origPan.x + (e.clientX - startX);
+    fbState.pan.y = origPan.y + (e.clientY - startY);
+    freeboardApplyTransform();
+  });
+  window.addEventListener("mouseup", () => { panning = false; if (viewport) viewport.style.cursor = "grab"; });
+  viewport.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    freeboardZoom(e.deltaY < 0 ? 0.08 : -0.08);
+  }, { passive: false });
+}
+
+async function freeboardAddNote() {
+  const viewport = document.getElementById("fb-viewport");
+  const rect = viewport.getBoundingClientRect();
+  const x = (rect.width/2 - fbState.pan.x) / fbState.scale - 90;
+  const y = (rect.height/2 - fbState.pan.y) / fbState.scale - 70;
+  await claudeDb.collection(fbState.path).add({
+    tipo: "nota", texto: "", color: FREEBOARD_NOTE_COLORS[Math.floor(Math.random()*FREEBOARD_NOTE_COLORS.length)],
+    x, y, w: 180, h: 140, createdAt: new Date().toISOString()
+  });
+}
+async function freeboardAddImage(file) {
+  const url = await sgUploadImage(file, "tablero/" + fbState.path.replace(/\//g, "_"));
+  const viewport = document.getElementById("fb-viewport");
+  const rect = viewport.getBoundingClientRect();
+  const x = (rect.width/2 - fbState.pan.x) / fbState.scale - 110;
+  const y = (rect.height/2 - fbState.pan.y) / fbState.scale - 90;
+  await claudeDb.collection(fbState.path).add({
+    tipo: "imagen", url, x, y, w: 220, h: 180, createdAt: new Date().toISOString()
+  });
+}
+function freeboardRenderItems() {
+  const canvas = document.getElementById("fb-canvas");
+  if (!canvas) return;
+  canvas.innerHTML = fbState.items.map(it => {
+    if (it.tipo === "imagen") {
+      return '<div class="tablero-item tablero-img" data-id="' + it.id + '" style="left:' + it.x + 'px; top:' + it.y + 'px; width:' + it.w + 'px; height:' + it.h + 'px;">' +
+        '<img src="' + it.url + '" draggable="false">' +
+        '<button class="tablero-item-del" data-id="' + it.id + '">×</button>' +
+      '</div>';
+    }
+    return '<div class="tablero-item tablero-nota" data-id="' + it.id + '" style="left:' + it.x + 'px; top:' + it.y + 'px; width:' + it.w + 'px; height:' + it.h + 'px; background:' + (it.color||"#FFF3B0") + ';">' +
+      '<textarea class="tablero-nota-text" data-id="' + it.id + '" placeholder="Escribe una idea...">' + (it.texto||"") + '</textarea>' +
+      '<button class="tablero-item-del" data-id="' + it.id + '">×</button>' +
+    '</div>';
+  }).join("");
+
+  canvas.querySelectorAll(".tablero-item-del").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      claudeDb.doc(fbState.path + "/" + btn.dataset.id).delete();
+    });
+  });
+  canvas.querySelectorAll(".tablero-nota-text").forEach(ta => {
+    ta.addEventListener("blur", () => {
+      const it = fbState.items.find(x => x.id === ta.dataset.id);
+      if (it && ta.value !== it.texto) {
+        claudeDb.doc(fbState.path + "/" + ta.dataset.id).set(Object.assign({}, it, { texto: ta.value }));
+      }
+    });
+  });
+  canvas.querySelectorAll(".tablero-item").forEach(el => freeboardSetupItemDrag(el));
+}
+function freeboardSetupItemDrag(el) {
+  let dragging = false, startX = 0, startY = 0, origX = 0, origY = 0;
+  el.addEventListener("mousedown", (e) => {
+    if (e.target.tagName === "TEXTAREA" || e.target.classList.contains("tablero-item-del")) return;
+    dragging = true;
+    startX = e.clientX; startY = e.clientY;
+    origX = parseFloat(el.style.left); origY = parseFloat(el.style.top);
+    el.classList.add("dragging");
+    e.stopPropagation();
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    const dx = (e.clientX - startX) / fbState.scale;
+    const dy = (e.clientY - startY) / fbState.scale;
+    el.style.left = (origX + dx) + "px";
+    el.style.top = (origY + dy) + "px";
+  });
+  window.addEventListener("mouseup", () => {
+    if (!dragging) return;
+    dragging = false;
+    el.classList.remove("dragging");
+    const id = el.dataset.id;
+    const it = fbState.items.find(x => x.id === id);
+    if (it) {
+      const newX = parseFloat(el.style.left), newY = parseFloat(el.style.top);
+      claudeDb.doc(fbState.path + "/" + id).set(Object.assign({}, it, { x: newX, y: newY }));
+    }
+  });
 }
 
 function pillarPill(p){ return '<span class="pilar-pill ' + (PILAR_CLASS[p]||"") + '">' + p + '</span>'; }
 function estadoPill(e){ const info = estadoInfo(e); return '<span class="estado-pill ' + info.class + '">' + info.label + '</span>'; }
 function prioridadPill(p){ return '<span class="prioridad-pill ' + (PRIORIDAD_CLASS[p]||"") + '">' + (p||"") + '</span>'; }
+
+// Convierte una celda (de pilar o estado) en un <select> editable al hacer
+// clic, y guarda el cambio en Firestore de inmediato al elegir una opción —
+// sin abrir el panel completo de detalle. Estilo Notion: edición directa
+// desde la tabla.
+function openInlineSelect(td, field, options, renderFn) {
+  if (td.querySelector("select")) return; // ya está en edición
+  const id = td.dataset.id;
+  const it = piezasCache.find(x => x.id === id);
+  if (!it) return;
+  const current = it[field];
+  const select = document.createElement("select");
+  select.className = "estado-select";
+  select.innerHTML = options.map(o => '<option value="' + o + '"' + (o===current?" selected":"") + '>' + o + '</option>').join("");
+  td.innerHTML = "";
+  td.appendChild(select);
+  select.focus();
+  const commit = async () => {
+    const nuevoValor = select.value;
+    td.innerHTML = renderFn(nuevoValor);
+    if (nuevoValor !== current) {
+      await claudeDb.doc("meses/" + currentMesId + "/piezas/" + id).set(Object.assign({}, it, { [field]: nuevoValor, id }));
+    }
+  };
+  select.addEventListener("change", commit);
+  select.addEventListener("blur", () => { if (td.querySelector("select")) td.innerHTML = renderFn(current); });
+}
 
 function renderTable() {
   const body = document.getElementById("table-body");
@@ -1850,11 +2071,20 @@ function renderTable() {
     '<td class="pieza-cell">' + it.pieza + '</td>' +
     '<td><span class="fmt-tag">' + (it.canal||"—") + '</span></td>' +
     '<td><span class="fmt-tag">' + it.formato + '</span></td>' +
-    '<td>' + pillarPill(it.pilar) + '</td>' +
-    '<td>' + estadoPill(it.estado) + '</td>' +
+    '<td class="inline-edit-cell" data-id="' + it.id + '" data-field="pilar">' + pillarPill(it.pilar) + '</td>' +
+    '<td class="inline-edit-cell" data-id="' + it.id + '" data-field="estado">' + estadoPill(it.estado) + '</td>' +
     '<td>' + prioridadPill(it.prioridad) + '</td></tr>'
   )).join("");
-  body.querySelectorAll("tr.clickable-row").forEach(tr => tr.addEventListener("click", () => openDetail(tr.dataset.id)));
+  body.querySelectorAll("tr.clickable-row").forEach(tr => tr.addEventListener("click", (e) => {
+    if (e.target.closest(".inline-edit-cell")) return; // la celda ya maneja su propio clic
+    openDetail(tr.dataset.id);
+  }));
+  body.querySelectorAll('.inline-edit-cell[data-field="pilar"]').forEach(td => {
+    td.addEventListener("click", (e) => { e.stopPropagation(); openInlineSelect(td, "pilar", Object.keys(PILAR_CLASS), (v) => pillarPill(v)); });
+  });
+  body.querySelectorAll('.inline-edit-cell[data-field="estado"]').forEach(td => {
+    td.addEventListener("click", (e) => { e.stopPropagation(); openInlineSelect(td, "estado", ESTADO_FLOW.map(e=>e.label), (v) => estadoPill(v)); });
+  });
 }
 
 function renderBoard() {
@@ -1864,14 +2094,37 @@ function renderBoard() {
   const active = pilares.filter(p => currentFilter==="Todos" || currentFilter===p);
   board.innerHTML = active.map(p => {
     const cards = piezasCache.filter(it => it.pilar === p);
-    return '<div class="board-col"><div class="bc-head">' + pillarPill(p) + '<span class="bc-count">' + cards.length + '</span></div>' +
+    return '<div class="board-col" data-pilar="' + p + '"><div class="bc-head">' + pillarPill(p) + '<span class="bc-count">' + cards.length + '</span></div>' +
+      '<div class="bc-drop-zone" data-pilar="' + p + '">' +
       cards.map(it => (
-        '<div class="board-card" data-id="' + it.id + '"><div class="bcard-fecha">' + fechaDisplay(it.fechaISO) + ' · ' + it.formato + '</div>' +
+        '<div class="board-card" draggable="true" data-id="' + it.id + '"><div class="bcard-fecha">' + fechaDisplay(it.fechaISO) + ' · ' + it.formato + '</div>' +
         '<div class="bcard-title">' + it.pieza + '</div>' +
         '<div class="badge-row">' + estadoPill(it.estado) + prioridadPill(it.prioridad) + '</div></div>'
-      )).join("") + '</div>';
+      )).join("") + '</div></div>';
   }).join("");
-  board.querySelectorAll(".board-card").forEach(card => card.addEventListener("click", () => openDetail(card.dataset.id)));
+
+  board.querySelectorAll(".board-card").forEach(card => {
+    card.addEventListener("click", (e) => { if (!card.classList.contains("just-dragged")) openDetail(card.dataset.id); });
+    card.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", card.dataset.id);
+      card.classList.add("dragging-card");
+    });
+    card.addEventListener("dragend", () => card.classList.remove("dragging-card"));
+  });
+  board.querySelectorAll(".bc-drop-zone").forEach(zone => {
+    zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("drop-hover"); });
+    zone.addEventListener("dragleave", () => zone.classList.remove("drop-hover"));
+    zone.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      zone.classList.remove("drop-hover");
+      const id = e.dataTransfer.getData("text/plain");
+      const nuevoPilar = zone.dataset.pilar;
+      const it = piezasCache.find(x => x.id === id);
+      if (it && it.pilar !== nuevoPilar) {
+        await claudeDb.doc("meses/" + currentMesId + "/piezas/" + id).set(Object.assign({}, it, { pilar: nuevoPilar, id }));
+      }
+    });
+  });
 }
 
 /* ---------------- detail panel ---------------- */
@@ -3193,163 +3446,12 @@ function gwToolDefs() {
   return tools;
 }
 
-/* ---------------- TABLERO (brainstorming libre, estilo Miro/FigJam) ---------------- */
-let gwTableroItems = [];
-let gwUnsubTablero = null;
-let gwTableroScale = 1;
-let gwTableroPan = { x: 0, y: 0 };
-
+/* ---------------- TABLERO (brainstorming libre dentro de un proyecto) ----------------
+   Reutiliza la función genérica renderFreeboard definida más arriba en el
+   archivo, apuntando a la subcolección de tablero de ESTE proyecto. */
 function renderTableroTab(panel) {
-  panel.innerHTML =
-    '<div class="tablero-toolbar">' +
-      '<button class="empty-btn" id="tablero-add-note">+ Nota</button>' +
-      '<label class="empty-btn" id="tablero-add-img-label" style="cursor:pointer;">+ Imagen<input type="file" accept="image/*" id="tablero-add-img-input" style="display:none;"></label>' +
-      '<button class="tablero-zoom-btn" id="tablero-zoom-out">−</button>' +
-      '<span class="tablero-zoom-label" id="tablero-zoom-label">100%</span>' +
-      '<button class="tablero-zoom-btn" id="tablero-zoom-in">+</button>' +
-      '<button class="tablero-zoom-btn" id="tablero-zoom-reset" title="Centrar vista">⤾</button>' +
-    '</div>' +
-    '<div class="tablero-viewport" id="tablero-viewport">' +
-      '<div class="tablero-canvas" id="tablero-canvas"></div>' +
-    '</div>';
-
-  gwTableroScale = 1; gwTableroPan = { x: 0, y: 0 };
-  document.getElementById("tablero-add-note").addEventListener("click", () => tableroAddItem("nota"));
-  document.getElementById("tablero-add-img-input").addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (file) tableroAddImage(file);
-  });
-  document.getElementById("tablero-zoom-in").addEventListener("click", () => tableroZoom(0.1));
-  document.getElementById("tablero-zoom-out").addEventListener("click", () => tableroZoom(-0.1));
-  document.getElementById("tablero-zoom-reset").addEventListener("click", () => { gwTableroScale = 1; gwTableroPan = {x:0,y:0}; applyTableroTransform(); });
-
-  setupTableroPan();
-
-  if (gwUnsubTablero) gwUnsubTablero();
-  gwUnsubTablero = gDb.collection("proyectos/" + currentProjectId + "/tablero").onSnapshot((snap) => {
-    gwTableroItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderTableroItems();
-  });
-}
-
-function tableroZoom(delta) {
-  gwTableroScale = Math.max(0.3, Math.min(2.5, gwTableroScale + delta));
-  document.getElementById("tablero-zoom-label").textContent = Math.round(gwTableroScale * 100) + "%";
-  applyTableroTransform();
-}
-function applyTableroTransform() {
-  const canvas = document.getElementById("tablero-canvas");
-  if (!canvas) return;
-  canvas.style.transform = "translate(" + gwTableroPan.x + "px," + gwTableroPan.y + "px) scale(" + gwTableroScale + ")";
-}
-
-function setupTableroPan() {
-  const viewport = document.getElementById("tablero-viewport");
-  let panning = false, startX = 0, startY = 0, origPan = {x:0,y:0};
-  viewport.addEventListener("mousedown", (e) => {
-    if (e.target !== viewport && e.target.id !== "tablero-canvas") return; // no interferir con drag de notas
-    panning = true; startX = e.clientX; startY = e.clientY; origPan = {...gwTableroPan};
-    viewport.style.cursor = "grabbing";
-  });
-  window.addEventListener("mousemove", (e) => {
-    if (!panning) return;
-    gwTableroPan.x = origPan.x + (e.clientX - startX);
-    gwTableroPan.y = origPan.y + (e.clientY - startY);
-    applyTableroTransform();
-  });
-  window.addEventListener("mouseup", () => { panning = false; viewport.style.cursor = "grab"; });
-  viewport.addEventListener("wheel", (e) => {
-    e.preventDefault();
-    tableroZoom(e.deltaY < 0 ? 0.08 : -0.08);
-  }, { passive: false });
-}
-
-const NOTE_COLORS = ["#FFF3B0", "#FFD6E8", "#D4F4DD", "#D6E8FF", "#E8D6FF", "#FFE0C7"];
-
-async function tableroAddItem(tipo) {
-  const viewport = document.getElementById("tablero-viewport");
-  const rect = viewport.getBoundingClientRect();
-  // posiciona la nueva nota cerca del centro visible del lienzo, en coordenadas del canvas
-  const x = (rect.width/2 - gwTableroPan.x) / gwTableroScale - 90;
-  const y = (rect.height/2 - gwTableroPan.y) / gwTableroScale - 70;
-  await gDb.collection("proyectos/" + currentProjectId + "/tablero").add({
-    tipo: "nota", texto: "", color: NOTE_COLORS[Math.floor(Math.random()*NOTE_COLORS.length)],
-    x, y, w: 180, h: 140, createdAt: new Date().toISOString()
-  });
-}
-
-async function tableroAddImage(file) {
-  const url = await sgUploadImage(file, "tablero/" + currentProjectId);
-  const viewport = document.getElementById("tablero-viewport");
-  const rect = viewport.getBoundingClientRect();
-  const x = (rect.width/2 - gwTableroPan.x) / gwTableroScale - 110;
-  const y = (rect.height/2 - gwTableroPan.y) / gwTableroScale - 90;
-  await gDb.collection("proyectos/" + currentProjectId + "/tablero").add({
-    tipo: "imagen", url, x, y, w: 220, h: 180, createdAt: new Date().toISOString()
-  });
-}
-
-function renderTableroItems() {
-  const canvas = document.getElementById("tablero-canvas");
-  if (!canvas) return;
-  canvas.innerHTML = gwTableroItems.map(it => {
-    if (it.tipo === "imagen") {
-      return '<div class="tablero-item tablero-img" data-id="' + it.id + '" style="left:' + it.x + 'px; top:' + it.y + 'px; width:' + it.w + 'px; height:' + it.h + 'px;">' +
-        '<img src="' + it.url + '" draggable="false">' +
-        '<button class="tablero-item-del" data-id="' + it.id + '">×</button>' +
-      '</div>';
-    }
-    return '<div class="tablero-item tablero-nota" data-id="' + it.id + '" style="left:' + it.x + 'px; top:' + it.y + 'px; width:' + it.w + 'px; height:' + it.h + 'px; background:' + (it.color||"#FFF3B0") + ';">' +
-      '<textarea class="tablero-nota-text" data-id="' + it.id + '" placeholder="Escribe una idea...">' + (it.texto||"") + '</textarea>' +
-      '<button class="tablero-item-del" data-id="' + it.id + '">×</button>' +
-    '</div>';
-  }).join("");
-
-  canvas.querySelectorAll(".tablero-item-del").forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      gDb.doc("proyectos/" + currentProjectId + "/tablero/" + btn.dataset.id).delete();
-    });
-  });
-  canvas.querySelectorAll(".tablero-nota-text").forEach(ta => {
-    ta.addEventListener("blur", () => {
-      const it = gwTableroItems.find(x => x.id === ta.dataset.id);
-      if (it && ta.value !== it.texto) {
-        gDb.doc("proyectos/" + currentProjectId + "/tablero/" + ta.dataset.id).set(Object.assign({}, it, { texto: ta.value }));
-      }
-    });
-  });
-  canvas.querySelectorAll(".tablero-item").forEach(el => setupItemDrag(el));
-}
-
-function setupItemDrag(el) {
-  let dragging = false, startX = 0, startY = 0, origX = 0, origY = 0;
-  el.addEventListener("mousedown", (e) => {
-    if (e.target.tagName === "TEXTAREA" || e.target.classList.contains("tablero-item-del")) return;
-    dragging = true;
-    startX = e.clientX; startY = e.clientY;
-    origX = parseFloat(el.style.left); origY = parseFloat(el.style.top);
-    el.classList.add("dragging");
-    e.stopPropagation(); // no mover el lienzo mientras se arrastra una nota
-  });
-  window.addEventListener("mousemove", (e) => {
-    if (!dragging) return;
-    const dx = (e.clientX - startX) / gwTableroScale;
-    const dy = (e.clientY - startY) / gwTableroScale;
-    el.style.left = (origX + dx) + "px";
-    el.style.top = (origY + dy) + "px";
-  });
-  window.addEventListener("mouseup", () => {
-    if (!dragging) return;
-    dragging = false;
-    el.classList.remove("dragging");
-    const id = el.dataset.id;
-    const it = gwTableroItems.find(x => x.id === id);
-    if (it) {
-      const newX = parseFloat(el.style.left), newY = parseFloat(el.style.top);
-      gDb.doc("proyectos/" + currentProjectId + "/tablero/" + id).set(Object.assign({}, it, { x: newX, y: newY }));
-    }
-  });
+  panel.innerHTML = '<div id="gw-tablero-panel"></div>';
+  renderFreeboard("gw-tablero-panel", "proyectos/" + currentProjectId + "/tablero");
 }
 
 function renderChatTab(panel) {
