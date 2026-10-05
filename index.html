@@ -3945,9 +3945,20 @@ function initFrameworksView() {
     document.getElementById("fw-empty").querySelector(".script").textContent = "No se pudo conectar al backend";
     return;
   }
-  fwDb.collection("Frameworks").orderBy("id", "asc").onSnapshot(
-    (snap) => {
-      fwCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  let primeraVez = true;
+  fwDb.collection("Frameworks").onSnapshot(
+    async (snap) => {
+      fwCache = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (a.id||"").localeCompare(b.id||""));
+      // Los frameworks viven originalmente en la hoja "Frameworks" de Google
+      // Sheets (los crea Code.gs). Cuando se migró el resto de los datos a
+      // Firestore, esta colección se quedó vacía en Firestore — así que, si
+      // no hay nada aquí la primera vez, se migran automáticamente desde el
+      // Sheet, una sola vez, y quedan en Firestore para siempre después.
+      if (primeraVez && fwCache.length === 0) {
+        primeraVez = false;
+        await migrarFrameworksDesdeSheet();
+        return; // el propio onSnapshot se vuelve a disparar solo al escribirse
+      }
       renderFrameworksList(document.getElementById("fw-search").value || "");
     },
     (err) => {
@@ -3957,6 +3968,28 @@ function initFrameworksView() {
     }
   );
   document.getElementById("fw-search").addEventListener("input", (e) => renderFrameworksList(e.target.value));
+}
+
+// Migración única: lee la hoja "Frameworks" de Google Sheets (vía Code.gs,
+// que ya expone la acción genérica "read") y copia cada framework a
+// Firestore, para que la vista de Frameworks deje de depender del Sheet.
+async function migrarFrameworksDesdeSheet() {
+  const empty = document.getElementById("fw-empty");
+  try {
+    if (empty) { empty.style.display = ""; empty.querySelector(".script").textContent = "Importando frameworks por primera vez..."; }
+    const res = await sgBackendCall({ action: "read", sheet: "Frameworks" });
+    const rows = res.rows || [];
+    if (!rows.length) {
+      if (empty) empty.querySelector(".script").textContent = "No hay frameworks en el Sheet para importar.";
+      return;
+    }
+    await Promise.all(rows.map(r => fwDb.doc("Frameworks/" + r.id).set({
+      id: r.id, keywords: r.keywords || "", contenido: r.contenido || ""
+    })));
+  } catch (e) {
+    console.error("migrarFrameworksDesdeSheet error", e);
+    if (empty) empty.querySelector(".script").textContent = "No se pudo importar desde el Sheet: " + (e.message || "error");
+  }
 }
 
 function fwMatches(fw, query) {
