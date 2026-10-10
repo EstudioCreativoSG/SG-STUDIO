@@ -381,6 +381,11 @@ table.par-table tr.clickable-row { cursor: pointer; }
 .board-card.dragging-card { opacity:0.4; cursor:grabbing; }
 .bc-drop-zone { min-height: 40px; border-radius:8px; transition: background 0.12s; }
 .bc-drop-zone.drop-hover { background: rgba(108,79,214,0.08); outline: 2px dashed var(--slate-pale); }
+tr.clickable-row { cursor: grab; }
+tr.clickable-row.row-drop-hover td { background: rgba(108,79,214,0.1) !important; outline: 2px dashed var(--slate-pale); outline-offset: -2px; }
+.inline-date-input { border:1px solid var(--line); border-radius:6px; padding:0.2rem 0.4rem; font-family:inherit; font-size:0.82rem; }
+.cal-piece { cursor:grab; }
+.cal-cell-drop-hover { background: rgba(108,79,214,0.1) !important; outline: 2px dashed #6C4FD6; outline-offset:-2px; }
 
 .badge-row { display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; margin-top:0.35rem; }
 
@@ -435,9 +440,11 @@ table.par-table tr.clickable-row { cursor: pointer; }
 /* --- edición inline del panel de detalle (estilo Notion) --- */
 .dp-delete { position:absolute; top: calc(1rem + env(safe-area-inset-top, 0px)); right: 3.8rem; background: rgba(240,235,226,0.12); border:none; color: var(--linen); width:32px; height:32px; border-radius:50%; font-size:0.95rem; }
 .dp-delete:hover { background: #C0392B; }
+.dp-duplicate { position:absolute; top: calc(1rem + env(safe-area-inset-top, 0px)); right: 7.1rem; background: rgba(240,235,226,0.12); border:none; color: var(--linen); width:32px; height:32px; border-radius:50%; font-size:0.9rem; }
+.dp-duplicate:hover { background: rgba(240,235,226,0.28); }
 .dp-title[contenteditable] { outline:none; cursor:text; border-radius:6px; }
 .dp-title[contenteditable]:hover, .dp-title[contenteditable]:focus { background: rgba(240,235,226,0.08); }
-.dp-save-indicator { position:absolute; top: calc(1rem + env(safe-area-inset-top, 0px)); right: 7.2rem; font-size:0.7rem; color: var(--slate-pale); opacity:0; transition: opacity 0.2s; }
+.dp-save-indicator { position:absolute; top: calc(1rem + env(safe-area-inset-top, 0px)); right: 10.5rem; font-size:0.7rem; color: var(--slate-pale); opacity:0; transition: opacity 0.2s; }
 .dp-save-indicator.show { opacity:1; }
 .dp-meta-edit { display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.6rem; align-items:center; }
 .dp-meta-edit select {
@@ -1340,6 +1347,7 @@ body.sg-gate-open { overflow: hidden; }
 <aside class="detail-panel" id="detail-panel">
   <div class="dp-head">
     <button class="dp-close" id="dp-close" aria-label="Cerrar">×</button>
+    <button class="dp-duplicate" id="dp-duplicate" title="Duplicar pieza">⧉</button>
     <button class="dp-delete" id="dp-delete" title="Eliminar pieza">🗑</button>
     <p class="dp-id" id="dp-id"></p>
     <h3 class="dp-title" id="dp-title" contenteditable="true" data-field="pieza"></h3>
@@ -2354,7 +2362,7 @@ function renderCalendarView(containerId) {
         '<div class="cal-daynum">' + d + '</div>' +
         '<div class="cal-pieces">' +
           piezasDia.slice(0, 3).map(it => (
-            '<div class="cal-piece" data-id="' + it.id + '" style="border-left-color:' + (PILAR_COLOR_HEX[it.pilar]||"#6C4FD6") + ';">' + escapeHtml(it.pieza) + '</div>'
+            '<div class="cal-piece" draggable="true" data-id="' + it.id + '" style="border-left-color:' + (PILAR_COLOR_HEX[it.pilar]||"#6C4FD6") + ';">' + escapeHtml(it.pieza) + '</div>'
           )).join("") +
           (piezasDia.length > 3 ? '<div class="cal-piece-more">+' + (piezasDia.length - 3) + ' más</div>' : '') +
         '</div>' +
@@ -2389,9 +2397,28 @@ function renderCalendarView(containerId) {
   });
   container.querySelectorAll(".cal-piece").forEach(el => {
     el.addEventListener("click", () => openDetail(el.dataset.id));
+    el.addEventListener("dragstart", (e) => {
+      e.stopPropagation();
+      e.dataTransfer.setData("text/plain", el.dataset.id);
+    });
   });
   container.querySelectorAll(".cal-add-btn").forEach(btn => {
     btn.addEventListener("click", (e) => { e.stopPropagation(); crearPiezaEnFecha(btn.dataset.fecha); });
+  });
+  // Soltar una pieza arrastrada sobre un día distinto mueve su fecha a ese día.
+  container.querySelectorAll(".cal-cell[data-fecha]").forEach(cell => {
+    cell.addEventListener("dragover", (e) => { e.preventDefault(); cell.classList.add("cal-cell-drop-hover"); });
+    cell.addEventListener("dragleave", () => cell.classList.remove("cal-cell-drop-hover"));
+    cell.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      cell.classList.remove("cal-cell-drop-hover");
+      const draggedId = e.dataTransfer.getData("text/plain");
+      const nuevaFecha = cell.dataset.fecha;
+      const it = piezasCache.find(x => x.id === draggedId);
+      if (it && it.fechaISO !== nuevaFecha) {
+        await claudeDb.doc("meses/" + currentMesId + "/piezas/" + draggedId).set(Object.assign({}, it, { fechaISO: nuevaFecha, id: draggedId }));
+      }
+    });
   });
 }
 
@@ -2456,8 +2483,8 @@ function renderTable() {
   if (!body) return;
   const rows = piezasCache.filter(it => currentFilter==="Todos" || it.pilar===currentFilter);
   body.innerHTML = rows.map(it => (
-    '<tr class="clickable-row" data-id="' + it.id + '"><td class="id-cell">' + (it.numero||it.id) + '</td>' +
-    '<td class="fecha-cell">' + fechaDisplay(it.fechaISO) + '</td>' +
+    '<tr class="clickable-row" draggable="true" data-id="' + it.id + '"><td class="id-cell">' + (it.numero||it.id) + '</td>' +
+    '<td class="fecha-cell inline-edit-cell" data-id="' + it.id + '" data-field="fechaISO">' + fechaDisplay(it.fechaISO) + '</td>' +
     '<td class="pieza-cell">' + it.pieza + '</td>' +
     '<td><span class="fmt-tag">' + (it.canal||"—") + '</span></td>' +
     '<td><span class="fmt-tag">' + it.formato + '</span></td>' +
@@ -2465,16 +2492,65 @@ function renderTable() {
     '<td class="inline-edit-cell" data-id="' + it.id + '" data-field="estado">' + estadoPill(it.estado) + '</td>' +
     '<td>' + prioridadPill(it.prioridad) + '</td></tr>'
   )).join("");
-  body.querySelectorAll("tr.clickable-row").forEach(tr => tr.addEventListener("click", (e) => {
-    if (e.target.closest(".inline-edit-cell")) return; // la celda ya maneja su propio clic
-    openDetail(tr.dataset.id);
-  }));
+  body.querySelectorAll("tr.clickable-row").forEach(tr => {
+    tr.addEventListener("click", (e) => {
+      if (e.target.closest(".inline-edit-cell")) return; // la celda ya maneja su propio clic
+      openDetail(tr.dataset.id);
+    });
+    // Arrastrar la fila entera sobre otra fila mueve la pieza a la fecha de
+    // esa otra fila — una forma rápida de reprogramar sin abrir el detalle.
+    tr.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", tr.dataset.id);
+    });
+    tr.addEventListener("dragover", (e) => { e.preventDefault(); tr.classList.add("row-drop-hover"); });
+    tr.addEventListener("dragleave", () => tr.classList.remove("row-drop-hover"));
+    tr.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      tr.classList.remove("row-drop-hover");
+      const draggedId = e.dataTransfer.getData("text/plain");
+      if (draggedId === tr.dataset.id) return;
+      const targetPieza = piezasCache.find(x => x.id === tr.dataset.id);
+      const draggedPieza = piezasCache.find(x => x.id === draggedId);
+      if (targetPieza && draggedPieza && targetPieza.fechaISO !== draggedPieza.fechaISO) {
+        await claudeDb.doc("meses/" + currentMesId + "/piezas/" + draggedId).set(Object.assign({}, draggedPieza, { fechaISO: targetPieza.fechaISO, id: draggedId }));
+      }
+    });
+  });
   body.querySelectorAll('.inline-edit-cell[data-field="pilar"]').forEach(td => {
     td.addEventListener("click", (e) => { e.stopPropagation(); openInlineSelect(td, "pilar", Object.keys(PILAR_CLASS), (v) => pillarPill(v)); });
   });
   body.querySelectorAll('.inline-edit-cell[data-field="estado"]').forEach(td => {
     td.addEventListener("click", (e) => { e.stopPropagation(); openInlineSelect(td, "estado", ESTADO_FLOW.map(e=>e.label), (v) => estadoPill(v)); });
   });
+  body.querySelectorAll('.inline-edit-cell[data-field="fechaISO"]').forEach(td => {
+    td.addEventListener("click", (e) => { e.stopPropagation(); openInlineDateEdit(td); });
+  });
+}
+
+// Convierte una celda de fecha en un <input type="date"> editable al hacer
+// clic — igual que openInlineSelect pero para fechas en vez de opciones fijas.
+function openInlineDateEdit(td) {
+  if (td.querySelector("input")) return;
+  const id = td.dataset.id;
+  const it = piezasCache.find(x => x.id === id);
+  if (!it) return;
+  const current = it.fechaISO || "";
+  const input = document.createElement("input");
+  input.type = "date";
+  input.value = current;
+  input.className = "inline-date-input";
+  td.innerHTML = "";
+  td.appendChild(input);
+  input.focus();
+  const commit = async () => {
+    const nuevaFecha = input.value;
+    td.innerHTML = fechaDisplay(nuevaFecha);
+    if (nuevaFecha && nuevaFecha !== current) {
+      await claudeDb.doc("meses/" + currentMesId + "/piezas/" + id).set(Object.assign({}, it, { fechaISO: nuevaFecha, id }));
+    }
+  };
+  input.addEventListener("change", commit);
+  input.addEventListener("blur", () => { if (td.querySelector("input")) td.innerHTML = fechaDisplay(current); });
 }
 
 function renderBoard() {
@@ -2684,6 +2760,24 @@ async function deletePiezaActual() {
   closeDetail();
 }
 
+// Crea una copia exacta de la pieza abierta (mismo día, mismo contenido) y
+// abre el detalle de la copia de inmediato — para después arrastrarla al
+// día que corresponda (ej. repetir "Ya abrimos" varios días distintos sin
+// tener que volver a escribir todo cada vez).
+async function duplicatePiezaActual() {
+  if (!dpCurrentId || !currentMesId) return;
+  const original = piezasCache.find(x => x.id === dpCurrentId);
+  if (!original) return;
+  const col = claudeDb.collection("meses/" + currentMesId + "/piezas");
+  const copia = Object.assign({}, original);
+  delete copia.id; // se genera uno nuevo al hacer .add()
+  copia.numero = siguienteNumeroPieza();
+  copia.pieza = original.pieza; // se mantiene el mismo título; el usuario lo ajusta si quiere
+  copia.estado = "Idea"; // una copia nueva vuelve a empezar su flujo de producción
+  const { id } = await col.add(copia);
+  setTimeout(() => openDetail(id), 350);
+}
+
 /* ---------------- editor de guion estructurado (estilo Reels/Edits) ---------------- */
 // Cada escena: tiempo en pantalla, qué se ve (visual), texto en pantalla, y
 // audio/sonido — el mismo desglose que usa un editor de video corto real.
@@ -2759,6 +2853,7 @@ function closeDetail() {
 document.getElementById("overlay").addEventListener("click", closeDetail);
 document.getElementById("dp-close").addEventListener("click", closeDetail);
 document.getElementById("dp-delete").addEventListener("click", deletePiezaActual);
+document.getElementById("dp-duplicate").addEventListener("click", duplicatePiezaActual);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDetail(); });
 
 /* ---------------- tabs ---------------- */
