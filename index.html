@@ -461,7 +461,7 @@ tr.clickable-row.row-drop-hover td { background: rgba(108,79,214,0.1) !important
 .dp-meta-edit select option {
   background: var(--sg-ink, #2A2827); color: var(--linen, #F0EBE2);
 }
-.dp-meta-edit input[type="date"] {
+.dp-meta-edit input[type="date"], .dp-meta-edit input[type="time"] {
   background: rgba(240,235,226,0.12); color: var(--linen); border:1px solid rgba(240,235,226,0.28);
   border-radius:6px; padding:0.3rem 0.6rem; font-family:inherit; font-size:0.76rem; color-scheme: dark;
 }
@@ -821,7 +821,11 @@ body.sg-gate-open { overflow: hidden; }
 /* --- vista de calendario de la parrilla --- */
 .cal-header { display:flex; align-items:center; gap:0.8rem; padding:0.9rem 1rem; }
 .cal-month-label { font-family:'Fraunces', serif; font-size:1.2rem; margin:0; color:var(--ink); min-width:11em; text-align:center; }
-.cal-grid { display:grid; grid-template-columns: repeat(7, 1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+/* El calendario de escritorio permite scroll horizontal cuando la pantalla
+   es angosta, en vez de aplastar las 7 columnas hasta volverlas ilegibles
+   (ese era el bug: grid de ancho fijo sin mínimo ni scroll). */
+.cal-grid-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.cal-grid { display:grid; grid-template-columns: repeat(7, minmax(120px, 1fr)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:10px; overflow:hidden; min-width:840px; }
 .cal-weekday { background:var(--linen); padding:0.5rem; text-align:center; font-size:0.72rem; font-weight:700; color:var(--ink-soft); text-transform:uppercase; }
 .cal-cell { background:var(--white); min-height:110px; padding:0.4rem; position:relative; display:flex; flex-direction:column; }
 .cal-cell-empty { background:#FBF8F2; }
@@ -831,14 +835,53 @@ body.sg-gate-open { overflow: hidden; }
 .cal-pieces { flex:1; display:flex; flex-direction:column; gap:0.2rem; overflow:hidden; }
 .cal-piece { font-size:0.68rem; background:var(--linen); border-left:3px solid #6C4FD6; padding:0.15rem 0.35rem; border-radius:3px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .cal-piece:hover { background:#EDE7FB; }
-.cal-piece-more { font-size:0.65rem; color:var(--ink-soft); padding-left:0.35rem; }
+.cal-piece-more { font-size:0.65rem; color:var(--ink-soft); padding-left:0.35rem; background:none; border:none; text-align:left; cursor:pointer; text-decoration:underline; }
+.cal-piece-more:hover { color:#6C4FD6; }
 .cal-add-btn { position:absolute; top:0.3rem; right:0.3rem; width:18px; height:18px; border-radius:50%; background:transparent; border:1px solid var(--line); color:var(--ink-soft); font-size:0.75rem; line-height:1; opacity:0; transition:opacity 0.15s; }
 .cal-cell:hover .cal-add-btn { opacity:1; }
+/* En pantallas chicas, el calendario de grilla deja de tener sentido (cada
+   celda quedaría del tamaño de una estampilla); se cambia a una vista de
+   agenda: lista de días con piezas, mucho más usable en móvil. */
+.cal-grid-scroll { display: block; }
+.cal-agenda { display:none; }
 @media (max-width: 720px) {
-  .cal-cell { min-height:70px; font-size:0.9em; }
-  .cal-piece { display:none; }
-  .cal-pieces::after { content: attr(data-count); }
+  .cal-grid-scroll { display:none; }
+  .cal-agenda { display:block; }
 }
+.cal-agenda-day { border-bottom:1px solid var(--line); padding:0.8rem 1rem; }
+.cal-agenda-day.cal-agenda-today .cal-agenda-daynum { color:#6C4FD6; }
+.cal-agenda-daynum { font-size:0.85rem; font-weight:700; color:var(--ink-soft); margin-bottom:0.4rem; }
+.cal-agenda-empty { padding:2rem 1rem; text-align:center; color:var(--ink-soft); font-size:0.85rem; }
+.cal-piece-hora { font-weight:700; opacity:0.75; }
+.cal-day-popover { position:absolute; z-index:400; background:var(--white); border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.18); padding:0.7rem; width:240px; max-height:300px; overflow-y:auto; }
+.cal-day-popover-head { font-size:0.74rem; font-weight:700; color:var(--ink-soft); margin-bottom:0.5rem; text-transform:uppercase; }
+.cal-day-popover .cal-piece { white-space:normal; margin-bottom:0.3rem; }
+.dp-color-btn { width:28px; height:28px; border-radius:50%; border:2px solid rgba(240,235,226,0.4); cursor:pointer; flex-shrink:0; }
+.color-popover { position:absolute; z-index:400; background:var(--white); border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.18); padding:0.6rem; display:grid; grid-template-columns:repeat(5, 1fr); gap:0.4rem; width:168px; }
+.color-swatch-sm { width:26px; height:26px; border-radius:50%; border:none; cursor:pointer; }
+.color-swatch-reset { background:var(--linen); color:var(--ink-soft); font-size:0.8rem; }
+.hora-tag { font-size:0.72rem; color:var(--ink-soft); font-weight:600; }
+.dp-label-row { display:flex; align-items:center; justify-content:space-between; gap:0.5rem; }
+.dp-ai-field-btn { background:#EDE7FB; color:#5B3FA6; border:none; border-radius:999px; padding:0.2rem 0.6rem; font-size:0.68rem; font-weight:700; white-space:nowrap; }
+.dp-ai-field-btn:hover { background:#DED4F7; }
+.dp-ai-field-btn:disabled { opacity:0.6; }
+#toast-holder { position:fixed; bottom:1.2rem; right:1.2rem; z-index:900; display:flex; flex-direction:column; gap:0.6rem; max-width:340px; }
+.sg-toast { background:var(--ink); color:var(--linen); padding:0.8rem 1rem; border-radius:10px; font-size:0.84rem; box-shadow:0 8px 24px rgba(0,0,0,0.25); opacity:0; transform:translateY(10px); transition:opacity 0.25s, transform 0.25s; }
+.sg-toast.show { opacity:1; transform:translateY(0); }
+.sg-toast.question { background:#5B3FA6; }
+.sg-toast.success { background:#1C7A42; }
+.sg-toast.error { background:#C0392B; }
+.chat-piece-picker-row { display:flex; align-items:center; gap:0.5rem; padding:0 0.2rem 0.4rem; flex-wrap:wrap; }
+.chat-piece-picker-btn { background:none; border:1px dashed var(--line); border-radius:999px; padding:0.3rem 0.8rem; font-size:0.74rem; color:var(--ink-soft); }
+.chat-piece-picker-btn:hover { border-color:var(--slate-pale); color:var(--slate-deep); }
+.chat-piece-picker-tag { display:inline-flex; align-items:center; gap:0.4rem; background:#EDE7FB; color:#5B3FA6; border-radius:999px; padding:0.3rem 0.5rem 0.3rem 0.8rem; font-size:0.74rem; font-weight:600; }
+.chat-piece-picker-tag button { background:none; border:none; color:#5B3FA6; font-size:0.9rem; line-height:1; }
+.piece-picker-popover { position:fixed; z-index:400; background:var(--white); border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.18); width:280px; max-height:320px; display:flex; flex-direction:column; }
+.piece-picker-search { border:none; border-bottom:1px solid var(--line); padding:0.6rem 0.8rem; font-family:inherit; font-size:0.84rem; border-radius:10px 10px 0 0; }
+.piece-picker-list { overflow-y:auto; }
+.piece-picker-item { padding:0.5rem 0.8rem; font-size:0.82rem; cursor:pointer; }
+.piece-picker-item:hover { background:#F3F0FB; }
+.piece-picker-empty { padding:1rem 0.8rem; font-size:0.8rem; color:var(--ink-soft); }
 .gw-tabs { display:flex; gap:0.5rem; margin-top: 1.2rem; flex-wrap:wrap; }
 .gw-tab-btn { background: rgba(240,235,226,0.1); border:1px solid rgba(240,235,226,0.25); color:#D8D2C4; border-radius:999px; padding:0.45rem 1rem; font-size:0.8rem; font-weight:500; }
 .gw-tab-btn.active { background: var(--sg-orange); border-color: var(--sg-orange); color: #fff; }
@@ -1312,6 +1355,10 @@ body.sg-gate-open { overflow: hidden; }
       <div id="chat-banner-slot"></div>
       <div class="chat-input-wrap">
         <div class="chat-attach-preview" id="chat-attach-preview"></div>
+        <div class="chat-piece-picker-row">
+          <button class="chat-piece-picker-btn" id="chat-piece-picker-btn">🔗 Hablar sobre una pieza específica</button>
+          <span class="chat-piece-picker-tag" id="chat-piece-picker-tag" style="display:none;"></span>
+        </div>
         <div class="chat-input-row">
           <button class="chat-icon-btn" id="chat-attach-btn" title="Adjuntar referencia" style="display:none;">📎</button>
           <input type="file" id="chat-file-input" accept="image/*" multiple style="display:none;">
@@ -1552,6 +1599,7 @@ let currentFilter = "Todos";
 let currentMode = "table"; // table | board | calendar | freeboard
 
 let chatTurns = [];        // [{role, content}]
+let chatPiezaSeleccionadaId = null; // id de la pieza elegida para "hablar sobre ella" en el chat
 let attachedImages = [];   // File[]
 let activeAbort = null;
 
@@ -1611,7 +1659,11 @@ REGLA DE REACCIONES: nunca pedir "di que está rica" ni actuar reacciones ni usa
 
 CÓMO SE MIDE: nunca likes como KPI principal. Sí: atención (retención), descubrimiento (salir de la comunidad actual), conversación real, compartibilidad, participación de comunidad, aprendizaje (¿esto merece repetirse?).
 
-TU FORMA DE TRABAJAR: piensas a la vez como directora creativa, diseñadora gráfica, community manager, influencer y creadora de contenido. Eres directa, con criterio propio, nada corporativa ni acartonada — hablas como alguien del equipo, no como un asistente de IA genérico. No pides disculpas de más, no llenas de disclaimers, no dices "como IA no puedo". Si una idea es floja, lo dices y propones algo mejor. Usas frases cortas. Cuando alguien te pide una parrilla completa, la construyes de verdad usando la herramienta crear_pieza para cada pieza (no te limites a describirla en el chat) y usas listar_piezas primero para no repetir fechas ni ideas ya usadas ese mes. Si te piden un mes que no existe todavía, créalo primero con crear_mes. Cuando alguien te pide hooks, CTAs, guiones o brainstorm sueltos (sin pedir que arme la parrilla), respondes directo en el chat, en el tono de VOLTA, sin necesidad de usar herramientas.`;
+TU FORMA DE TRABAJAR: piensas a la vez como directora creativa, diseñadora gráfica, community manager, influencer y creadora de contenido. Eres directa, con criterio propio, nada corporativa ni acartonada — hablas como alguien del equipo, no como un asistente de IA genérico. No pides disculpas de más, no llenas de disclaimers, no dices "como IA no puedo". Si una idea es floja, lo dices y propones algo mejor. Usas frases cortas.
+
+REGLA CRÍTICA E INQUEBRANTABLE SOBRE HERRAMIENTAS: cualquier pedido de AGREGAR, CREAR, PROGRAMAR o METER algo a la parrilla —una sola pieza suelta ("agrega una story"), varias piezas, o una parrilla completa del mes— SIEMPRE se hace llamando a la herramienta crear_pieza, una vez por cada pieza. Nunca, bajo ninguna circunstancia, describas una pieza en el chat como si ya estuviera creada sin haber llamado a crear_pieza de verdad — eso le hace creer al usuario que algo se guardó cuando no se guardó nada, y es el peor error que puedes cometer. Si dudas si el usuario quiere que quede guardado, asume que SÍ quiere que quede guardado y usa la herramienta; es muchísimo peor fingir que guardaste algo que preguntar de más. Usa listar_piezas primero para no repetir fechas ni ideas ya usadas ese mes. Si te piden un mes que no existe todavía, créalo primero con crear_mes. Solo cuando el usuario pide explícitamente ideas, hooks, CTAs o brainstorm SUELTOS para pensar en voz alta (dejando claro que no quiere guardarlo todavía, ej. "dame ideas de hooks para pensar"), respondes directo en el chat sin usar herramientas.
+
+Si el usuario se refiere a una pieza que YA EXISTE en la parrilla (ya sea porque te da su nombre, su id, o porque el mensaje viene con el contexto "Pieza seleccionada: ...") y te pide agregarle o cambiarle algo (el hook, el CTA, el guion, la idea, etc.), usa SIEMPRE la herramienta editar_pieza con el id de esa pieza — nunca crear_pieza (eso crearía una pieza duplicada en vez de completar la que ya existe).`;
 
 /* ---------------- date helpers ---------------- */
 const MES_ES = ["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
@@ -2362,11 +2414,30 @@ function renderCalendarView(containerId) {
         '<div class="cal-daynum">' + d + '</div>' +
         '<div class="cal-pieces">' +
           piezasDia.slice(0, 3).map(it => (
-            '<div class="cal-piece" draggable="true" data-id="' + it.id + '" style="border-left-color:' + (PILAR_COLOR_HEX[it.pilar]||"#6C4FD6") + ';">' + escapeHtml(it.pieza) + '</div>'
+            '<div class="cal-piece" draggable="true" data-id="' + it.id + '" style="border-left-color:' + (piezaColor(it)) + ';">' + (it.horaInicio ? '<span class="cal-piece-hora">' + it.horaInicio + '</span> ' : '') + escapeHtml(it.pieza) + '</div>'
           )).join("") +
-          (piezasDia.length > 3 ? '<div class="cal-piece-more">+' + (piezasDia.length - 3) + ' más</div>' : '') +
+          (piezasDia.length > 3 ? '<button class="cal-piece-more" data-fecha="' + iso + '">+' + (piezasDia.length - 3) + ' más</button>' : '') +
         '</div>' +
         '<button class="cal-add-btn" data-fecha="' + iso + '" title="Agregar pieza este día">+</button>' +
+      '</div>'
+    );
+  }
+
+  // Vista de agenda (móvil): lista vertical de días del mes con sus piezas,
+  // sin aplastar nada — reemplaza la grilla cuando la pantalla es angosta.
+  const agendaHtml = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = year + "-" + String(month+1).padStart(2,"0") + "-" + String(d).padStart(2,"0");
+    const piezasDia = porFecha[iso] || [];
+    const esHoy = iso === new Date().toISOString().slice(0,10);
+    const nombreDia = new Date(year, month, d).toLocaleDateString("es", { weekday: "short" });
+    agendaHtml.push(
+      '<div class="cal-agenda-day' + (esHoy ? " cal-agenda-today" : "") + '" data-fecha="' + iso + '">' +
+        '<div class="cal-agenda-daynum">' + d + ' ' + nombreDia.charAt(0).toUpperCase() + nombreDia.slice(1) + '</div>' +
+        piezasDia.map(it => (
+          '<div class="cal-piece" data-id="' + it.id + '" style="border-left-color:' + (piezaColor(it)) + '; margin-bottom:0.3rem;">' + (it.horaInicio ? '<span class="cal-piece-hora">' + it.horaInicio + '</span> ' : '') + escapeHtml(it.pieza) + '</div>'
+        )).join("") +
+        '<button class="cal-add-btn" style="position:static; opacity:1; width:auto; height:auto; border-radius:6px; padding:0.2rem 0.6rem; font-size:0.7rem; margin-top:0.2rem;" data-fecha="' + iso + '">+ Agregar</button>' +
       '</div>'
     );
   }
@@ -2378,10 +2449,11 @@ function renderCalendarView(containerId) {
       '<button class="tablero-zoom-btn" id="cal-next">›</button>' +
       '<button class="empty-btn" id="cal-today-btn" style="margin-left:0.8rem; padding:0.4rem 0.9rem;">Hoy</button>' +
     '</div>' +
-    '<div class="cal-grid">' +
+    '<div class="cal-grid-scroll"><div class="cal-grid">' +
       ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d => '<div class="cal-weekday">' + d + '</div>').join("") +
       celdas.join("") +
-    '</div>';
+    '</div></div>' +
+    '<div class="cal-agenda">' + agendaHtml.join("") + '</div>';
 
   document.getElementById("cal-prev").addEventListener("click", () => {
     calCurrentMonth.month--; if (calCurrentMonth.month < 0) { calCurrentMonth.month = 11; calCurrentMonth.year--; }
@@ -2405,8 +2477,12 @@ function renderCalendarView(containerId) {
   container.querySelectorAll(".cal-add-btn").forEach(btn => {
     btn.addEventListener("click", (e) => { e.stopPropagation(); crearPiezaEnFecha(btn.dataset.fecha); });
   });
+  // "+N más": muestra el resto de piezas de ese día en una tarjeta flotante.
+  container.querySelectorAll(".cal-piece-more").forEach(btn => {
+    btn.addEventListener("click", (e) => { e.stopPropagation(); abrirPopoverDia(btn, btn.dataset.fecha, porFecha[btn.dataset.fecha] || []); });
+  });
   // Soltar una pieza arrastrada sobre un día distinto mueve su fecha a ese día.
-  container.querySelectorAll(".cal-cell[data-fecha]").forEach(cell => {
+  container.querySelectorAll(".cal-cell[data-fecha], .cal-agenda-day[data-fecha]").forEach(cell => {
     cell.addEventListener("dragover", (e) => { e.preventDefault(); cell.classList.add("cal-cell-drop-hover"); });
     cell.addEventListener("dragleave", () => cell.classList.remove("cal-cell-drop-hover"));
     cell.addEventListener("drop", async (e) => {
@@ -2422,10 +2498,90 @@ function renderCalendarView(containerId) {
   });
 }
 
+// Tarjeta flotante que lista TODAS las piezas de un día cuando hay más de 3
+// (antes "+N más" no hacía nada — era texto sin acción).
+function abrirPopoverDia(anchorEl, fechaISO, piezasDia) {
+  document.querySelectorAll(".cal-day-popover").forEach(p => p.remove());
+  const pop = document.createElement("div");
+  pop.className = "cal-day-popover";
+  pop.innerHTML =
+    '<div class="cal-day-popover-head">' + fechaDisplay(fechaISO) + '</div>' +
+    piezasDia.map(it => (
+      '<div class="cal-piece" data-id="' + it.id + '" style="border-left-color:' + (piezaColor(it)) + ';">' + (it.horaInicio ? '<span class="cal-piece-hora">' + it.horaInicio + '</span> ' : '') + escapeHtml(it.pieza) + '</div>'
+    )).join("");
+  document.body.appendChild(pop);
+  const rect = anchorEl.getBoundingClientRect();
+  pop.style.left = Math.min(rect.left, window.innerWidth - 260) + "px";
+  pop.style.top = (rect.bottom + window.scrollY + 4) + "px";
+  pop.querySelectorAll(".cal-piece").forEach(el => el.addEventListener("click", () => { openDetail(el.dataset.id); pop.remove(); }));
+  setTimeout(() => {
+    document.addEventListener("click", function closePop(e) {
+      if (!pop.contains(e.target)) { pop.remove(); document.removeEventListener("click", closePop); }
+    });
+  }, 0);
+}
+
 const PILAR_COLOR_HEX = {
   "Marca": "#6C4FD6", "Producto": "#6C4FD6", "Proceso": "#A78BDA",
   "Cultura": "#2A2827", "Comunidad": "#8C6FE0", "Espontáneo": "#C9C1B2"
 };
+
+// Paleta de colores asignables a una pieza individual (primarios, secundarios
+// y celeste, como se pidió). PILAR_COLOR_HEX de arriba sigue siendo el color
+// POR DEFECTO según el pilar; esto permite sobreescribirlo pieza por pieza.
+const PIEZA_COLOR_PALETTE = [
+  "#2563EB", // azul (primario)
+  "#DC2626", // rojo (primario)
+  "#16A34A", // verde (primario)
+  "#7C3AED", // morado (secundario)
+  "#EA580C", // naranja (secundario)
+  "#EAB308", // amarillo (secundario)
+  "#0EA5E9", // celeste
+  "#DB2777", // rosa (secundario)
+  "#64748B"  // gris neutro, por si no se quiere resaltar
+];
+
+// El color propio de la pieza (si se asignó uno manual) tiene prioridad
+// sobre el color por defecto de su pilar.
+function piezaColor(it) {
+  return it.color || PILAR_COLOR_HEX[it.pilar] || "#6C4FD6";
+}
+
+// Calcula si el texto debe verse negro o blanco sobre un color de fondo dado,
+// según su luminosidad — así un amarillo claro usa texto oscuro y un morado
+// oscuro usa texto claro, sin tener que elegirlo a mano por cada color.
+function colorTextoLegible(hexColor) {
+  const hex = String(hexColor || "#6C4FD6").replace("#", "");
+  const r = parseInt(hex.substr(0,2), 16), g = parseInt(hex.substr(2,2), 16), b = parseInt(hex.substr(4,2), 16);
+  const luminancia = (0.299*r + 0.587*g + 0.114*b) / 255;
+  return luminancia > 0.6 ? "#2A2827" : "#FFFFFF";
+}
+
+function abrirSelectorColorPieza(anchorEl, it) {
+  document.querySelectorAll(".color-popover").forEach(p => p.remove());
+  const pop = document.createElement("div");
+  pop.className = "color-popover";
+  pop.innerHTML = PIEZA_COLOR_PALETTE.map(c =>
+    '<button class="color-swatch-sm" style="background:' + c + ';" data-color="' + c + '"></button>'
+  ).join("") + '<button class="color-swatch-sm color-swatch-reset" data-color="" title="Quitar color (usar el del pilar)">✕</button>';
+  document.body.appendChild(pop);
+  const rect = anchorEl.getBoundingClientRect();
+  pop.style.left = Math.min(rect.left, window.innerWidth - 180) + "px";
+  pop.style.top = (rect.bottom + window.scrollY + 4) + "px";
+  pop.querySelectorAll("[data-color]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const color = btn.dataset.color || null;
+      await savePieza({ color: color });
+      anchorEl.style.background = color || PILAR_COLOR_HEX[it.pilar] || "#6C4FD6";
+      pop.remove();
+    });
+  });
+  setTimeout(() => {
+    document.addEventListener("click", function closePop(e) {
+      if (!pop.contains(e.target) && e.target !== anchorEl) { pop.remove(); document.removeEventListener("click", closePop); }
+    });
+  }, 0);
+}
 
 // Igual que crearPiezaNuevaYAbrir, pero fijando la fecha al día del
 // calendario donde el usuario hizo clic en "+".
@@ -2484,7 +2640,7 @@ function renderTable() {
   const rows = piezasCache.filter(it => currentFilter==="Todos" || it.pilar===currentFilter);
   body.innerHTML = rows.map(it => (
     '<tr class="clickable-row" draggable="true" data-id="' + it.id + '"><td class="id-cell">' + (it.numero||it.id) + '</td>' +
-    '<td class="fecha-cell inline-edit-cell" data-id="' + it.id + '" data-field="fechaISO">' + fechaDisplay(it.fechaISO) + '</td>' +
+    '<td class="fecha-cell inline-edit-cell" data-id="' + it.id + '" data-field="fechaISO">' + fechaDisplay(it.fechaISO) + (it.horaInicio ? ' <span class="hora-tag">' + it.horaInicio + '</span>' : '') + '</td>' +
     '<td class="pieza-cell">' + it.pieza + '</td>' +
     '<td><span class="fmt-tag">' + (it.canal||"—") + '</span></td>' +
     '<td><span class="fmt-tag">' + it.formato + '</span></td>' +
@@ -2563,7 +2719,7 @@ function renderBoard() {
     return '<div class="board-col" data-pilar="' + p + '"><div class="bc-head">' + pillarPill(p) + '<span class="bc-count">' + cards.length + '</span></div>' +
       '<div class="bc-drop-zone" data-pilar="' + p + '">' +
       cards.map(it => (
-        '<div class="board-card" draggable="true" data-id="' + it.id + '"><div class="bcard-fecha">' + fechaDisplay(it.fechaISO) + ' · ' + it.formato + '</div>' +
+        '<div class="board-card" draggable="true" data-id="' + it.id + '" style="border-left:3px solid ' + piezaColor(it) + ';"><div class="bcard-fecha">' + fechaDisplay(it.fechaISO) + (it.horaInicio ? ' ' + it.horaInicio : '') + ' · ' + it.formato + '</div>' +
         '<div class="bcard-title">' + it.pieza + '</div>' +
         '<div class="badge-row">' + estadoPill(it.estado) + prioridadPill(it.prioridad) + '</div></div>'
       )).join("") + '</div></div>';
@@ -2635,7 +2791,9 @@ function openDetail(id) {
     '<select id="dp-f-formato">' + formatosDisponibles.map(f => '<option value="' + f + '"' + (f===it.formato?" selected":"") + '>' + f + '</option>').join("") + '</select>' +
     '<select id="dp-f-estado">' + ESTADO_FLOW.map(e => '<option value="' + e.label + '"' + (e.label===it.estado?" selected":"") + '>' + e.label + '</option>').join("") + '</select>' +
     '<select id="dp-f-prioridad">' + Object.keys(PRIORIDAD_CLASS).map(p => '<option value="' + p + '"' + (p===it.prioridad?" selected":"") + '>' + p + '</option>').join("") + '</select>' +
-    '<input type="date" id="dp-f-fecha" value="' + (it.fechaISO||"") + '">';
+    '<input type="date" id="dp-f-fecha" value="' + (it.fechaISO||"") + '">' +
+    '<input type="time" id="dp-f-hora" value="' + (it.horaInicio||"") + '" title="Hora (opcional)">' +
+    '<button class="dp-color-btn" id="dp-color-btn" style="background:' + (it.color||"#6C4FD6") + ';" title="Color de la pieza"></button>';
 
   document.getElementById("dp-f-canal").onchange = (e) => {
     const nuevosFormatos = FORMATOS_POR_CANAL[e.target.value] || FORMATOS_POR_CANAL["Otro"];
@@ -2646,6 +2804,8 @@ function openDetail(id) {
   document.getElementById("dp-f-estado").onchange = (e) => savePieza({ estado: e.target.value });
   document.getElementById("dp-f-prioridad").onchange = (e) => savePieza({ prioridad: e.target.value });
   document.getElementById("dp-f-fecha").onchange = (e) => savePieza({ fechaISO: e.target.value });
+  document.getElementById("dp-f-hora").onchange = (e) => savePieza({ horaInicio: e.target.value });
+  document.getElementById("dp-color-btn").addEventListener("click", (e) => abrirSelectorColorPieza(e.currentTarget, it));
 
   const objEl = document.getElementById("dp-obj");
   objEl.textContent = (it.objetivo||[]).join(", ");
@@ -2660,7 +2820,8 @@ function openDetail(id) {
   ];
   const body = document.getElementById("dp-body");
   body.innerHTML = camposLargos.map(([field, label]) => (
-    '<div class="dp-block"><p class="dp-label">' + label + '</p>' +
+    '<div class="dp-block"><div class="dp-label-row"><p class="dp-label">' + label + '</p>' +
+    '<button class="dp-ai-field-btn" data-field="' + field + '" data-label="' + label + '" title="Generar con IA usando el resto de la pieza">✨ IA</button></div>' +
     '<textarea class="dp-field-text" data-field="' + field + '" rows="2">' + (it[field]||"") + '</textarea></div>'
   )).join("") +
   '<hr class="dp-divider">' +
@@ -2682,6 +2843,9 @@ function openDetail(id) {
       const field = ta.dataset.field;
       if (ta.value !== (it[field]||"")) savePieza({ [field]: ta.value });
     });
+  });
+  body.querySelectorAll(".dp-ai-field-btn").forEach(btn => {
+    btn.addEventListener("click", () => generarCampoConIA(btn.dataset.field, btn.dataset.label, btn));
   });
 
   renderImgGrid(it);
@@ -2776,6 +2940,141 @@ async function duplicatePiezaActual() {
   copia.estado = "Idea"; // una copia nueva vuelve a empezar su flujo de producción
   const { id } = await col.add(copia);
   setTimeout(() => openDetail(id), 350);
+}
+
+/* ---------------- toast (notificación flotante no bloqueante) ---------------- */
+/* ---------------- selector de "pieza específica" para el chat del Estudio IA ---------------- */
+function abrirSelectorPiezaChat() {
+  document.querySelectorAll(".piece-picker-popover").forEach(p => p.remove());
+  const pop = document.createElement("div");
+  pop.className = "piece-picker-popover";
+  const piezasOrdenadas = piezasCache.slice().sort((a,b) => (a.fechaISO||"").localeCompare(b.fechaISO||""));
+  pop.innerHTML =
+    '<input type="text" class="piece-picker-search" placeholder="Buscar pieza..." id="piece-picker-search">' +
+    '<div class="piece-picker-list" id="piece-picker-list">' +
+      (piezasOrdenadas.length
+        ? piezasOrdenadas.map(p => '<div class="piece-picker-item" data-id="' + p.id + '">' + fechaDisplay(p.fechaISO) + ' — ' + escapeHtml(p.pieza) + '</div>').join("")
+        : '<div class="piece-picker-empty">No hay piezas en este mes todavía.</div>') +
+    '</div>';
+  document.body.appendChild(pop);
+  const anchor = document.getElementById("chat-piece-picker-btn");
+  const rect = anchor.getBoundingClientRect();
+  pop.style.left = rect.left + "px";
+  pop.style.bottom = (window.innerHeight - rect.top + 6) + "px";
+
+  const searchInput = document.getElementById("piece-picker-search");
+  searchInput.focus();
+  searchInput.addEventListener("input", () => {
+    const q = searchInput.value.toLowerCase();
+    pop.querySelectorAll(".piece-picker-item").forEach(el => {
+      el.style.display = el.textContent.toLowerCase().includes(q) ? "" : "none";
+    });
+  });
+  pop.querySelectorAll(".piece-picker-item").forEach(el => {
+    el.addEventListener("click", () => {
+      chatPiezaSeleccionadaId = el.dataset.id;
+      actualizarTagPiezaSeleccionada();
+      pop.remove();
+    });
+  });
+  setTimeout(() => {
+    document.addEventListener("click", function closePop(e) {
+      if (!pop.contains(e.target) && e.target !== anchor) { pop.remove(); document.removeEventListener("click", closePop); }
+    });
+  }, 0);
+}
+function actualizarTagPiezaSeleccionada() {
+  const tag = document.getElementById("chat-piece-picker-tag");
+  const pz = piezasCache.find(p => p.id === chatPiezaSeleccionadaId);
+  if (!pz) { tag.style.display = "none"; return; }
+  tag.style.display = "inline-flex";
+  tag.innerHTML = '📌 ' + escapeHtml(pz.pieza) + ' <button id="chat-piece-picker-clear">×</button>';
+  document.getElementById("chat-piece-picker-clear").addEventListener("click", (e) => {
+    e.stopPropagation();
+    chatPiezaSeleccionadaId = null;
+    actualizarTagPiezaSeleccionada();
+  });
+}
+document.getElementById("chat-piece-picker-btn")?.addEventListener("click", abrirSelectorPiezaChat);
+
+function showToast(mensaje, tipo) {
+  let holder = document.getElementById("toast-holder");
+  if (!holder) {
+    holder = document.createElement("div");
+    holder.id = "toast-holder";
+    document.body.appendChild(holder);
+  }
+  const toast = document.createElement("div");
+  toast.className = "sg-toast " + (tipo || "info");
+  toast.textContent = mensaje;
+  holder.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add("show"));
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 300);
+  }, 6000);
+}
+
+/* ---------------- generar un campo específico con IA (usa el resto de la pieza como contexto) ---------------- */
+// Cada campo de la pieza (hook, idea, CTA, guion...) tiene su propio botón
+// "✨ IA". Al presionarlo, se arma un resumen de TODO lo que la pieza ya
+// tiene (fecha, canal, formato, pilar, y cualquier otro campo ya lleno) y se
+// le pide a Gemini que genere específicamente el campo pedido, en el tono de
+// VOLTA. Si Gemini necesita más información para hacerlo bien (en vez de
+// inventar), responde con una pregunta — esa pregunta se muestra como un
+// toast en vez de rellenar el campo con algo genérico.
+async function generarCampoConIA(field, label, btnEl) {
+  const it = piezasCache.find(x => x.id === dpCurrentId);
+  if (!it) return;
+
+  const resumenPieza = [
+    "Pieza: " + (it.pieza || "(sin título)"),
+    "Fecha: " + (it.fechaISO || "sin definir") + (it.horaInicio ? " " + it.horaInicio : ""),
+    "Canal: " + (it.canal || "—") + " / Formato: " + (it.formato || "—"),
+    "Pilar: " + (it.pilar || "—"),
+    it.objetivo && it.objetivo.length ? "Objetivo: " + it.objetivo.join(", ") : null,
+    it.hook ? "Hook ya escrito: " + it.hook : null,
+    it.idea ? "Idea ya escrita: " + it.idea : null,
+    it.concepto ? "Concepto ya escrito: " + it.concepto : null,
+    it.guion ? "Guion ya escrito: " + it.guion : null,
+    it.caption ? "Caption ya escrito: " + it.caption : null,
+    it.cta ? "CTA ya escrito: " + it.cta : null,
+    it.conversacion ? "Conversación buscada: " + it.conversacion : null,
+    it.material ? "Material: " + it.material : null,
+    it.notas ? "Notas de dirección: " + it.notas : null,
+  ].filter(Boolean).join("\n");
+
+  const prompt =
+    "Esta es la información que ya existe de una pieza de contenido:\n" + resumenPieza +
+    "\n\nGenera SOLO el campo \"" + label + "\" para esta pieza, en el tono de VOLTA. " +
+    "Responde ÚNICAMENTE con el contenido final de ese campo, sin explicaciones ni comillas ni encabezados. " +
+    "Si de verdad te falta información esencial para hacerlo bien (por ejemplo, no sabes qué recurso visual hay disponible, o qué se espera lograr), " +
+    "en vez de inventar, responde exactamente así: PREGUNTA: <tu pregunta breve y específica>.";
+
+  btnEl.disabled = true;
+  const textoOriginal = btnEl.textContent;
+  btnEl.textContent = "...";
+  try {
+    const respuesta = await freeboardAskGemini(prompt);
+    const esPregunta = /^PREGUNTA:/i.test(respuesta.trim());
+    if (esPregunta) {
+      showToast(respuesta.replace(/^PREGUNTA:\s*/i, ""), "question");
+    } else {
+      const textarea = document.querySelector('.dp-field-text[data-field="' + field + '"]');
+      if (textarea) {
+        textarea.value = respuesta.trim();
+        textarea.dispatchEvent(new Event("input")); // ajusta la altura del textarea
+        await savePieza({ [field]: respuesta.trim() });
+        showToast("\"" + label + "\" generado.", "success");
+      }
+    }
+  } catch (e) {
+    console.error("generarCampoConIA error", e);
+    showToast("Algo falló generando este campo: " + (e.message || "error"), "error");
+  } finally {
+    btnEl.disabled = false;
+    btnEl.textContent = textoOriginal;
+  }
 }
 
 /* ---------------- editor de guion estructurado (estilo Reels/Edits) ---------------- */
@@ -3029,6 +3328,34 @@ function toolDefs() {
         appendToolNote('Agregó "' + doc.pieza + '" (' + doc.formato + ', ' + fechaDisplay(doc.fechaISO) + ')');
         return { ok: true };
       }
+    },
+    {
+      name: "editar_pieza",
+      description: "Modifica uno o más campos de una pieza YA EXISTENTE en la parrilla (identificada por su id). Úsala cuando el usuario pida agregar o cambiar algo de una pieza puntual que ya está en la agenda — por ejemplo, agregarle el hook, el CTA, el guion, cambiar su idea, etc. Solo envía los campos que quieres cambiar; el resto de la pieza se conserva igual.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "El id exacto de la pieza a editar (usa listar_piezas primero si no lo tienes)." },
+          hook: { type: "string" }, idea: { type: "string" }, concepto: { type: "string" },
+          guion: { type: "string" }, caption: { type: "string" }, cta: { type: "string" },
+          conversacion: { type: "string" }, material: { type: "string" }, notas: { type: "string" },
+          pieza: { type: "string", description: "Nuevo título, si se quiere renombrar" },
+          estado: { type: "string" }, prioridad: { type: "string" }
+        },
+        required: ["id"]
+      },
+      execute: async (input) => {
+        if (!currentMesId) throw new Error("No hay mes activo.");
+        const actual = piezasCache.find(p => p.id === input.id);
+        if (!actual) throw new Error("No se encontró ninguna pieza con ese id en el mes activo. Usa listar_piezas para confirmar el id correcto.");
+        const cambios = Object.assign({}, input);
+        delete cambios.id;
+        const actualizado = Object.assign({}, actual, cambios, { id: input.id });
+        await claudeDb.doc("meses/" + currentMesId + "/piezas/" + input.id).set(actualizado);
+        const camposEditados = Object.keys(cambios).join(", ");
+        appendToolNote('Editó "' + actual.pieza + '": ' + camposEditados);
+        return { ok: true };
+      }
     }
   ];
 }
@@ -3053,7 +3380,19 @@ async function sendChat() {
     appendBubble("user", text);
   }
 
-  chatTurns.push({ role: "user", content: text || "(revisa la imagen adjunta)" });
+  // Si el usuario eligió "hablar sobre una pieza específica", se antepone su
+  // id y un resumen de su contenido actual al mensaje — así Gemini sabe
+  // exactamente a cuál pieza se refiere y usa editar_pieza con el id correcto
+  // en vez de adivinar o crear una pieza nueva por error.
+  let contenidoFinal = text || "(revisa la imagen adjunta)";
+  if (chatPiezaSeleccionadaId) {
+    const pz = piezasCache.find(p => p.id === chatPiezaSeleccionadaId);
+    if (pz) {
+      contenidoFinal = "Pieza seleccionada — id: " + pz.id + ", título: \"" + pz.pieza + "\", fecha: " + (pz.fechaISO||"—") +
+        ". Esto es lo que ya tiene (usa editar_pieza con este id para los cambios que pida a continuación):\n" + contenidoFinal;
+    }
+  }
+  chatTurns.push({ role: "user", content: contenidoFinal });
   chatInput.value = ""; chatInput.style.height = "auto";
   attachedImages = []; renderAttachPreview();
 
@@ -3840,7 +4179,7 @@ function buildSystemPrompt() {
       ctx += "\nCAMPAÑA — Objetivo: " + (p.campana.objetivo||"—") + ". Duración: " + (p.campana.duracion||"—") + ". Recursos: " + (p.campana.recursos||"—") + ".\n";
       ctx += "Antes de armar contenido, si hace falta, pregunta por el tiempo y los recursos disponibles si no están claros. Puedes investigar mercado conversacionalmente y guardar hallazgos con guardar_insight.\n";
     }
-    ctx += "\nCuando te pidan una parrilla completa, revisa primero con listar_piezas, crea el ciclo con crear_ciclo si no existe, y agrega cada pieza con crear_pieza (no te limites a describirlas en el chat). Para brainstorm, hooks o CTAs sueltos, responde directo en el chat.";
+    ctx += "\nREGLA CRÍTICA: cualquier pedido de agregar, crear o programar algo (una pieza suelta o una parrilla completa) SIEMPRE se hace llamando a crear_pieza de verdad, una vez por pieza — nunca describas algo como ya creado en el chat sin haber llamado a la herramienta. Revisa primero con listar_piezas, crea el ciclo con crear_ciclo si no existe. Solo si el usuario pide explícitamente ideas sueltas para pensar (sin guardarlas), responde directo en el chat.";
   }
   ctx += "\n\nHablas como una directora creativa con criterio real: directa, sin disculpas de más, sin sonar a asistente de IA genérico. Si una idea es floja, lo dices y propones algo mejor.";
   return ctx;
