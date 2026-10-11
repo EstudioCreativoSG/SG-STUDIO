@@ -2414,7 +2414,7 @@ function renderCalendarView(containerId) {
         '<div class="cal-daynum">' + d + '</div>' +
         '<div class="cal-pieces">' +
           piezasDia.slice(0, 3).map(it => (
-            '<div class="cal-piece" draggable="true" data-id="' + it.id + '" style="border-left-color:' + (piezaColor(it)) + ';">' + (it.horaInicio ? '<span class="cal-piece-hora">' + it.horaInicio + '</span> ' : '') + escapeHtml(it.pieza) + '</div>'
+            '<div class="cal-piece" draggable="true" data-id="' + it.id + '" style="' + piezaCardEstilo(it) + '">' + (it.horaInicio ? '<span class="cal-piece-hora">' + it.horaInicio + '</span> ' : '') + escapeHtml(it.pieza) + '</div>'
           )).join("") +
           (piezasDia.length > 3 ? '<button class="cal-piece-more" data-fecha="' + iso + '">+' + (piezasDia.length - 3) + ' más</button>' : '') +
         '</div>' +
@@ -2435,7 +2435,7 @@ function renderCalendarView(containerId) {
       '<div class="cal-agenda-day' + (esHoy ? " cal-agenda-today" : "") + '" data-fecha="' + iso + '">' +
         '<div class="cal-agenda-daynum">' + d + ' ' + nombreDia.charAt(0).toUpperCase() + nombreDia.slice(1) + '</div>' +
         piezasDia.map(it => (
-          '<div class="cal-piece" data-id="' + it.id + '" style="border-left-color:' + (piezaColor(it)) + '; margin-bottom:0.3rem;">' + (it.horaInicio ? '<span class="cal-piece-hora">' + it.horaInicio + '</span> ' : '') + escapeHtml(it.pieza) + '</div>'
+          '<div class="cal-piece" data-id="' + it.id + '" style="' + piezaCardEstilo(it) + ' margin-bottom:0.3rem;">' + (it.horaInicio ? '<span class="cal-piece-hora">' + it.horaInicio + '</span> ' : '') + escapeHtml(it.pieza) + '</div>'
         )).join("") +
         '<button class="cal-add-btn" style="position:static; opacity:1; width:auto; height:auto; border-radius:6px; padding:0.2rem 0.6rem; font-size:0.7rem; margin-top:0.2rem;" data-fecha="' + iso + '">+ Agregar</button>' +
       '</div>'
@@ -2507,7 +2507,7 @@ function abrirPopoverDia(anchorEl, fechaISO, piezasDia) {
   pop.innerHTML =
     '<div class="cal-day-popover-head">' + fechaDisplay(fechaISO) + '</div>' +
     piezasDia.map(it => (
-      '<div class="cal-piece" data-id="' + it.id + '" style="border-left-color:' + (piezaColor(it)) + ';">' + (it.horaInicio ? '<span class="cal-piece-hora">' + it.horaInicio + '</span> ' : '') + escapeHtml(it.pieza) + '</div>'
+      '<div class="cal-piece" data-id="' + it.id + '" style="' + piezaCardEstilo(it) + '">' + (it.horaInicio ? '<span class="cal-piece-hora">' + it.horaInicio + '</span> ' : '') + escapeHtml(it.pieza) + '</div>'
     )).join("");
   document.body.appendChild(pop);
   const rect = anchorEl.getBoundingClientRect();
@@ -2555,6 +2555,18 @@ function colorTextoLegible(hexColor) {
   const r = parseInt(hex.substr(0,2), 16), g = parseInt(hex.substr(2,2), 16), b = parseInt(hex.substr(4,2), 16);
   const luminancia = (0.299*r + 0.587*g + 0.114*b) / 255;
   return luminancia > 0.6 ? "#2A2827" : "#FFFFFF";
+}
+
+// Genera el CSS inline de una tarjeta de pieza en el calendario: si el
+// usuario eligió un color MANUAL para esta pieza, se usa como fondo completo
+// (con el texto calculado para que siempre se lea bien) — así se nota que es
+// una elección intencional. Si no hay color manual, se usa solo como borde
+// lateral sobre fondo neutro (el comportamiento de antes, ligado al pilar).
+function piezaCardEstilo(it) {
+  if (it.color) {
+    return "background:" + it.color + "; border-left-color:" + it.color + "; color:" + colorTextoLegible(it.color) + ";";
+  }
+  return "border-left-color:" + piezaColor(it) + ";";
 }
 
 function abrirSelectorColorPieza(anchorEl, it) {
