@@ -810,6 +810,11 @@ body.sg-gate-open { overflow: hidden; }
 .tablero-item-del { position:absolute; top:-8px; right:-8px; width:22px; height:22px; border-radius:50%; background:#2A2827; color:#fff; border:none; font-size:0.8rem; line-height:1; opacity:0; transition:opacity 0.15s; }
 .tablero-item:hover .tablero-item-del { opacity:1; }
 .tablero-item.selected { outline: 3px solid #6C4FD6; outline-offset: 2px; }
+.tablero-viewport.fb-drop-hover { outline: 3px dashed #6C4FD6; outline-offset: -6px; background-color: rgba(108,79,214,0.06); }
+.tablero-resize-handle { position:absolute; bottom:-7px; right:-7px; width:16px; height:16px; border-radius:50%; background:#6C4FD6; border:2px solid #fff; cursor:nwse-resize; box-shadow:0 1px 4px rgba(0,0,0,0.3); }
+.tablero-layer-bar { position:absolute; top:-34px; left:50%; transform:translateX(-50%); display:flex; gap:0.3rem; background:var(--ink); border-radius:999px; padding:0.25rem 0.4rem; box-shadow:0 2px 8px rgba(0,0,0,0.25); }
+.layer-btn { background:none; border:none; color:#F0EBE2; font-size:0.75rem; width:22px; height:22px; border-radius:50%; }
+.layer-btn:hover { background:rgba(240,235,226,0.2); }
 .tablero-img-loading { position:absolute; inset:0; background:rgba(255,255,255,0.75); display:flex; align-items:center; justify-content:center; }
 /* --- barra de IA del tablero (estilo Mixboard: prompt flotante abajo) --- */
 .fb-ai-bar { position:relative; display:flex; align-items:center; gap:0.7rem; padding:0.8rem 1rem; border-top:1px solid var(--line); background: var(--white); border-radius:0 0 12px 12px; }
@@ -2059,6 +2064,7 @@ function renderFreeboard(containerId, firestorePath) {
   document.getElementById("fb-ai-prompt").addEventListener("keydown", (e) => { if (e.key === "Enter") freeboardAiSubmit(); });
 
   freeboardSetupPan();
+  freeboardSetupDropAndPaste();
   freeboardUpdateSelectionTag();
 
   if (fbState.unsub) fbState.unsub();
@@ -2101,6 +2107,52 @@ function freeboardSetupPan() {
   }, { passive: false });
 }
 
+// Arrastrar archivos desde el computador y pegar con Ctrl+V una imagen
+// copiada (de otra web, de una captura de pantalla) directo al lienzo.
+let fbPasteListenerInstalado = false;
+function freeboardSetupDropAndPaste() {
+  const viewport = document.getElementById("fb-viewport");
+  if (!viewport) return;
+
+  viewport.addEventListener("dragover", (e) => { e.preventDefault(); viewport.classList.add("fb-drop-hover"); });
+  viewport.addEventListener("dragleave", (e) => { if (e.target === viewport) viewport.classList.remove("fb-drop-hover"); });
+  viewport.addEventListener("drop", (e) => {
+    e.preventDefault();
+    viewport.classList.remove("fb-drop-hover");
+    // Si lo que se soltó es una pieza del tablero (drag interno de una nota/imagen
+    // ya existente), eso lo maneja freeboardSetupItemDrag — aquí solo nos
+    // interesan archivos nuevos arrastrados desde fuera del navegador.
+    const files = Array.from(e.dataTransfer.files || []).filter(f => f.type.startsWith("image/"));
+    if (!files.length) return;
+    const rect = viewport.getBoundingClientRect();
+    const dropX = (e.clientX - rect.left - fbState.pan.x) / fbState.scale;
+    const dropY = (e.clientY - rect.top - fbState.pan.y) / fbState.scale;
+    files.forEach((file, i) => freeboardAddImage(file, dropX + i*24, dropY + i*24));
+  });
+
+  // El listener de "pegar" se instala UNA sola vez en todo el documento (no
+  // cada vez que se abre el tablero), y revisa si el tablero está visible
+  // antes de actuar — así Ctrl+V no interfiere con pegar texto en otros
+  // lugares de la app (como un campo de la Biblia o del chat).
+  if (fbPasteListenerInstalado) return;
+  fbPasteListenerInstalado = true;
+  document.addEventListener("paste", (e) => {
+    const vp = document.getElementById("fb-viewport");
+    if (!vp || vp.offsetParent === null) return; // el tablero no está visible ahora mismo
+    const items = Array.from(e.clipboardData && e.clipboardData.items || []);
+    const imageItem = items.find(it => it.type.startsWith("image/"));
+    if (!imageItem) return;
+    const file = imageItem.getAsFile();
+    if (file) freeboardAddImage(file); // centro de la vista actual, como al subir por botón
+  });
+}
+
+// Calcula la siguiente capa (z-index lógico) para que un bloque nuevo
+// siempre aparezca por encima de todo lo existente, como en Canva.
+function freeboardSiguienteZ() {
+  return fbState.items.reduce((max, it) => Math.max(max, it.z || 0), 0) + 1;
+}
+
 async function freeboardAddNote() {
   const viewport = document.getElementById("fb-viewport");
   const rect = viewport.getBoundingClientRect();
@@ -2108,35 +2160,54 @@ async function freeboardAddNote() {
   const y = (rect.height/2 - fbState.pan.y) / fbState.scale - 70;
   await claudeDb.collection(fbState.path).add({
     tipo: "nota", texto: "", color: FREEBOARD_NOTE_COLORS[Math.floor(Math.random()*FREEBOARD_NOTE_COLORS.length)],
-    x, y, w: 180, h: 140, createdAt: new Date().toISOString()
+    x, y, w: 180, h: 140, z: freeboardSiguienteZ(), createdAt: new Date().toISOString()
   });
 }
-async function freeboardAddImage(file) {
+async function freeboardAddImage(file, posX, posY) {
   const url = await sgUploadImage(file, "tablero/" + fbState.path.replace(/\//g, "_"));
-  const viewport = document.getElementById("fb-viewport");
-  const rect = viewport.getBoundingClientRect();
-  const x = (rect.width/2 - fbState.pan.x) / fbState.scale - 110;
-  const y = (rect.height/2 - fbState.pan.y) / fbState.scale - 90;
+  let x = posX, y = posY;
+  if (x === undefined || y === undefined) {
+    const viewport = document.getElementById("fb-viewport");
+    const rect = viewport.getBoundingClientRect();
+    x = (rect.width/2 - fbState.pan.x) / fbState.scale - 110;
+    y = (rect.height/2 - fbState.pan.y) / fbState.scale - 90;
+  }
   await claudeDb.collection(fbState.path).add({
-    tipo: "imagen", url, x, y, w: 220, h: 180, createdAt: new Date().toISOString()
+    tipo: "imagen", url, x, y, w: 220, h: 180, z: freeboardSiguienteZ(), createdAt: new Date().toISOString()
   });
 }
 function freeboardRenderItems() {
   const canvas = document.getElementById("fb-canvas");
   if (!canvas) return;
-  canvas.innerHTML = fbState.items.map(it => {
+  // Se dibuja en orden de capa (z) para que el apilado visual (qué tapa a
+  // qué) sea consistente con el z-index real, estilo Canva.
+  const itemsOrdenados = fbState.items.slice().sort((a,b) => (a.z||0) - (b.z||0));
+  canvas.innerHTML = itemsOrdenados.map(it => {
     const isSelected = fbState.selected.includes(it.id);
     const selClass = isSelected ? " selected" : "";
+    // El handle de redimensión y la mini-barra de capas solo se dibujan si
+    // el bloque está seleccionado — igual que en Canva, para no saturar el
+    // lienzo con controles cuando no se están usando.
+    const controles = isSelected
+      ? '<div class="tablero-resize-handle" data-id="' + it.id + '"></div>' +
+        '<div class="tablero-layer-bar" data-id="' + it.id + '">' +
+          '<button class="layer-btn" data-action="back" title="Enviar atrás">⬇</button>' +
+          '<button class="layer-btn" data-action="front" title="Traer al frente">⬆</button>' +
+        '</div>'
+      : '';
+    const zIndex = 100 + (it.z || 0);
     if (it.tipo === "imagen") {
       const loadingOverlay = it.generando ? '<div class="tablero-img-loading"><span class="spin"></span></div>' : "";
-      return '<div class="tablero-item tablero-img' + selClass + '" data-id="' + it.id + '" style="left:' + it.x + 'px; top:' + it.y + 'px; width:' + it.w + 'px; height:' + it.h + 'px;">' +
+      return '<div class="tablero-item tablero-img' + selClass + '" data-id="' + it.id + '" style="left:' + it.x + 'px; top:' + it.y + 'px; width:' + it.w + 'px; height:' + it.h + 'px; z-index:' + zIndex + ';">' +
         '<img src="' + (it.url||"") + '" draggable="false">' + loadingOverlay +
         '<button class="tablero-item-del" data-id="' + it.id + '">×</button>' +
+        controles +
       '</div>';
     }
-    return '<div class="tablero-item tablero-nota' + selClass + '" data-id="' + it.id + '" style="left:' + it.x + 'px; top:' + it.y + 'px; width:' + it.w + 'px; height:' + it.h + 'px; background:' + (it.color||"#FFF3B0") + ';">' +
+    return '<div class="tablero-item tablero-nota' + selClass + '" data-id="' + it.id + '" style="left:' + it.x + 'px; top:' + it.y + 'px; width:' + it.w + 'px; height:' + it.h + 'px; background:' + (it.color||"#FFF3B0") + '; z-index:' + zIndex + ';">' +
       '<textarea class="tablero-nota-text" data-id="' + it.id + '" placeholder="Escribe una idea...">' + (it.texto||"") + '</textarea>' +
       '<button class="tablero-item-del" data-id="' + it.id + '">×</button>' +
+      controles +
     '</div>';
   }).join("");
 
@@ -2156,10 +2227,19 @@ function freeboardRenderItems() {
       }
     });
   });
+  canvas.querySelectorAll(".layer-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      freeboardCambiarCapa(btn.closest(".tablero-layer-bar").dataset.id, btn.dataset.action);
+    });
+  });
+  canvas.querySelectorAll(".tablero-resize-handle").forEach(handle => {
+    freeboardSetupResize(handle);
+  });
   canvas.querySelectorAll(".tablero-item").forEach(el => {
     freeboardSetupItemDrag(el);
     el.addEventListener("click", (e) => {
-      if (e.target.tagName === "TEXTAREA" || e.target.classList.contains("tablero-item-del")) return;
+      if (e.target.tagName === "TEXTAREA" || e.target.classList.contains("tablero-item-del") || e.target.classList.contains("tablero-resize-handle") || e.target.classList.contains("layer-btn")) return;
       const id = el.dataset.id;
       if (e.shiftKey) {
         // Shift+clic: añade o quita del grupo seleccionado (selección múltiple)
@@ -2173,6 +2253,55 @@ function freeboardRenderItems() {
       freeboardRenderItems();
       freeboardUpdateSelectionTag();
     });
+  });
+}
+
+// Mueve un bloque al frente de todo o al fondo de todo, recalculando su
+// z para que quede por encima/debajo de los demás (no solo +1/-1, que podría
+// empatar con otro bloque y dejar el orden ambiguo).
+async function freeboardCambiarCapa(id, accion) {
+  const it = fbState.items.find(x => x.id === id);
+  if (!it) return;
+  const nuevoZ = accion === "front"
+    ? Math.max(0, ...fbState.items.map(x => x.z||0)) + 1
+    : Math.min(0, ...fbState.items.map(x => x.z||0)) - 1;
+  await claudeDb.doc(fbState.path + "/" + id).set(Object.assign({}, it, { z: nuevoZ }));
+}
+
+// Redimensionar un bloque arrastrando su esquina inferior-derecha — el mismo
+// gesto que usan Canva, Figma y la mayoría de editores visuales.
+function freeboardSetupResize(handle) {
+  let resizing = false, startX = 0, startY = 0, origW = 0, origH = 0;
+  const id = handle.dataset.id;
+  handle.addEventListener("mousedown", (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const it = fbState.items.find(x => x.id === id);
+    if (!it) return;
+    resizing = true;
+    startX = e.clientX; startY = e.clientY;
+    origW = it.w; origH = it.h;
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!resizing) return;
+    const el = handle.closest(".tablero-item");
+    if (!el) return;
+    const dx = (e.clientX - startX) / fbState.scale;
+    const dy = (e.clientY - startY) / fbState.scale;
+    const nuevoW = Math.max(60, origW + dx);
+    const nuevoH = Math.max(50, origH + dy);
+    el.style.width = nuevoW + "px";
+    el.style.height = nuevoH + "px";
+  });
+  window.addEventListener("mouseup", async () => {
+    if (!resizing) return;
+    resizing = false;
+    const el = handle.closest(".tablero-item");
+    const it = fbState.items.find(x => x.id === id);
+    if (el && it) {
+      const nuevoW = parseFloat(el.style.width), nuevoH = parseFloat(el.style.height);
+      await claudeDb.doc(fbState.path + "/" + id).set(Object.assign({}, it, { w: nuevoW, h: nuevoH }));
+    }
   });
 }
 
@@ -2344,7 +2473,8 @@ async function freeboardAddNoteWithText(texto) {
 function freeboardSetupItemDrag(el) {
   let dragging = false, startX = 0, startY = 0, origX = 0, origY = 0;
   el.addEventListener("mousedown", (e) => {
-    if (e.target.tagName === "TEXTAREA" || e.target.classList.contains("tablero-item-del")) return;
+    if (e.target.tagName === "TEXTAREA" || e.target.classList.contains("tablero-item-del") ||
+        e.target.classList.contains("tablero-resize-handle") || e.target.classList.contains("layer-btn")) return;
     dragging = true;
     startX = e.clientX; startY = e.clientY;
     origX = parseFloat(el.style.left); origY = parseFloat(el.style.top);
