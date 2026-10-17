@@ -306,8 +306,8 @@ p.lede { font-size: 1.05rem; max-width: 56ch; color: var(--ink-soft); font-weigh
 .grid-view { padding: 0 6vw 4rem; }
 
 /* table view */
-.par-table-wrap { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--white); }
-table.par-table { width: 100%; border-collapse: collapse; }
+.par-table-wrap { border: 1px solid var(--line); border-radius: 8px; background: var(--white); overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table.par-table { width: 100%; min-width: 760px; border-collapse: collapse; }
 table.par-table th { text-align: left; font-size: 0.7rem; letter-spacing: 0.06em; font-weight: 600; color: var(--ink-soft); background: var(--linen); padding: 0.85rem 1rem; border-bottom: 1px solid var(--line); }
 table.par-table td { padding: 0.85rem 1rem; font-size: 0.86rem; border-bottom: 1px solid var(--line); color: var(--ink); vertical-align: middle; }
 table.par-table tr:last-child td { border-bottom: none; }
@@ -334,6 +334,9 @@ table.par-table tr:hover td { background: #F3F0FB; }
 .board-card { background: var(--white); border: 1px solid var(--line); border-radius: 6px; padding: 0.75rem 0.8rem; margin-bottom: 0.6rem; }
 .board-card .bcard-fecha { font-size: 0.68rem; font-weight: 700; color: var(--slate-deep); letter-spacing: 0.03em; }
 .board-card .bcard-title { font-size: 0.84rem; font-weight: 500; color: var(--ink); margin: 0.3rem 0 0.5rem; line-height: 1.35; }
+/* cuando la tarjeta trae su propio color de fondo (según Estado), su texto
+   interno hereda ese color en vez del gris/negro fijo de arriba */
+.board-card[style*="background"] .bcard-fecha, .board-card[style*="background"] .bcard-title, .board-card[style*="background"] .prioridad-pill { color: inherit; }
 
 .prod-blocks { padding: 0 6vw 6rem; display: grid; grid-template-columns: 1.2fr 1fr; gap: 2rem; }
 @media (max-width: 800px) { .prod-blocks { grid-template-columns: 1fr; } }
@@ -792,7 +795,18 @@ body.sg-gate-open { overflow: hidden; }
 .color-swatch.selected { border-color: var(--ink); }
 
 /* --- tablero de brainstorming libre (estilo Miro/FigJam) --- */
+/* --- cabecera de sesión del Brainstorm (nombre + objetivo + guardado) --- */
+.fb-header { padding:0.9rem 1rem 0.3rem; border-bottom:1px solid var(--line); }
+.fb-header-row1 { display:flex; align-items:center; gap:0.7rem; }
+.fb-session-name { flex:1; border:none; background:transparent; font-family:'Fraunces', serif; font-size:1.25rem; color:var(--ink); padding:0.2rem 0; }
+.fb-session-name:focus { outline:none; border-bottom:1px solid var(--slate-pale); }
+.fb-session-goal { width:100%; border:none; background:transparent; font-family:inherit; font-size:0.82rem; color:var(--ink-soft); padding:0.15rem 0; margin-top:0.1rem; }
+.fb-session-goal:focus { outline:none; border-bottom:1px solid var(--line); }
+.fb-save-indicator { font-size:0.72rem; color:var(--slate-pale); opacity:0; transition:opacity 0.2s; white-space:nowrap; }
+.fb-save-indicator.show { opacity:1; }
+.fb-save-indicator.error { color:#C0392B; }
 .tablero-toolbar { display:flex; align-items:center; gap:0.6rem; padding:0.8rem 1rem; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+.fb-toolbar-spacer { flex:1; }
 .tablero-zoom-btn { background:var(--linen); border:1px solid var(--line); border-radius:6px; width:30px; height:30px; font-size:1rem; color:var(--ink); }
 .tablero-zoom-label { font-size:0.8rem; color:var(--ink-soft); min-width:3.2em; text-align:center; }
 .tablero-viewport { position:relative; width:100%; height:70vh; overflow:hidden; background:
@@ -816,12 +830,58 @@ body.sg-gate-open { overflow: hidden; }
 .layer-btn { background:none; border:none; color:#F0EBE2; font-size:0.75rem; width:22px; height:22px; border-radius:50%; }
 .layer-btn:hover { background:rgba(240,235,226,0.2); }
 .tablero-img-loading { position:absolute; inset:0; background:rgba(255,255,255,0.75); display:flex; align-items:center; justify-content:center; }
+
+/* --- nuevos tipos de tarjeta del Laboratorio de Ideas --- */
+.tablero-card-typed { padding:0.8rem; display:flex; flex-direction:column; overflow:hidden; }
+.tablero-card-kicker { font-size:0.62rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:0.4rem; display:flex; align-items:center; gap:0.3rem; }
+.tablero-card-title { font-family:'Fraunces', serif; font-size:0.95rem; line-height:1.3; margin-bottom:0.35rem; outline:none; }
+.tablero-card-body { font-family:'Poppins', sans-serif; font-size:0.76rem; line-height:1.4; flex:1; overflow-y:auto; outline:none; color:inherit; }
+.tablero-card-foot { font-size:0.65rem; opacity:0.75; margin-top:0.4rem; }
+
+.tablero-idea { background:#F3EEFF; border:1px solid #D9C9FF; color:#3E2E7A; }
+.tablero-idea .tablero-card-kicker { color:#6C4FD6; }
+
+.tablero-tendencia { background:#E9F7F2; border:1px solid #BDE8D8; color:#13513D; }
+.tablero-tendencia .tablero-card-kicker { color:#1C8A63; }
+
+.tablero-insight { background:#FFF7E0; border:1px solid #F3DE9E; color:#5C4813; }
+.tablero-insight .tablero-card-kicker { color:#A8781B; }
+
+.tablero-oportunidad { background:#FFECEA; border:1px solid #F5C3BC; color:#7A2A1E; }
+.tablero-oportunidad .tablero-card-kicker { color:#C0472F; }
+
+.tablero-concepto { background:#2A2827; border:1px solid #454340; color:#F0EBE2; }
+.tablero-concepto .tablero-card-kicker { color:#C9B8FF; }
+
+.tablero-card-expand-btn { align-self:flex-start; background:rgba(0,0,0,0.08); border:none; border-radius:999px; padding:0.15rem 0.6rem; font-size:0.65rem; font-weight:600; margin-top:0.4rem; color:inherit; }
+.tablero-card-expand-btn:hover { background:rgba(0,0,0,0.15); }
 /* --- barra de IA del tablero (estilo Mixboard: prompt flotante abajo) --- */
 .fb-ai-bar { position:relative; display:flex; align-items:center; gap:0.7rem; padding:0.8rem 1rem; border-top:1px solid var(--line); background: var(--white); border-radius:0 0 12px 12px; }
 .fb-ai-selection-tag { display:none; background:#EDE7FB; color:#5B3FA6; font-size:0.74rem; font-weight:600; padding:0.3rem 0.7rem; border-radius:999px; white-space:nowrap; }
 .fb-ai-bar input[type="text"] { flex:1; border:1px solid var(--line); border-radius:999px; padding:0.6rem 1rem; font-family:inherit; font-size:0.88rem; }
 .fb-ai-send { background: var(--slate); color:#fff; border:none; border-radius:999px; padding:0.6rem 1.2rem; font-size:0.85rem; font-weight:600; white-space:nowrap; }
 .fb-ai-send:disabled { opacity:0.5; }
+
+/* --- panel lateral de exploración de tendencias --- */
+.trends-panel { position:fixed; top:0; right:0; height:100%; width:360px; background:var(--white); border-left:1px solid var(--line); box-shadow:-8px 0 24px rgba(0,0,0,0.12); z-index:500; transform:translateX(100%); transition:transform 0.25s ease; overflow-y:auto; padding:1.2rem; }
+.trends-panel.open { transform:translateX(0); }
+.trends-panel-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.6rem; }
+.trends-panel-head h3 { font-family:'Fraunces', serif; font-size:1.15rem; margin:0; color:var(--ink); }
+.trends-panel-close-btn { background:var(--linen); border:none; color:var(--ink-soft); width:28px; height:28px; border-radius:50%; font-size:1rem; line-height:1; }
+.trends-panel-close-btn:hover { background:var(--line); color:var(--ink); }
+.trends-panel-note { font-size:0.78rem; color:var(--ink-soft); line-height:1.5; background:var(--linen); border-radius:8px; padding:0.7rem 0.8rem; margin-bottom:1.2rem; }
+.trends-section { border-top:1px solid var(--line); padding:1rem 0; }
+.trends-section:first-of-type { border-top:none; padding-top:0; }
+.trends-label { display:block; font-size:0.78rem; font-weight:600; color:var(--ink); margin-bottom:0.4rem; }
+.trends-hint { font-size:0.72rem; color:var(--ink-soft); margin:0.3rem 0 0; }
+.trends-row { display:flex; gap:0.5rem; }
+.trends-row input[type="text"] { flex:1; padding:0.5rem 0.7rem; border-radius:8px; border:1px solid var(--linen-warm); font-family:inherit; font-size:0.85rem; }
+.trends-row select { padding:0.5rem 0.4rem; border-radius:8px; border:1px solid var(--linen-warm); font-family:inherit; font-size:0.8rem; }
+.trends-csv-table { width:100%; border-collapse:collapse; font-size:0.72rem; margin-top:0.5rem; }
+.trends-csv-table td { padding:0.25rem 0.4rem; border-bottom:1px solid var(--line); color:var(--ink-soft); }
+@media (max-width: 720px) {
+  .trends-panel { width:100%; }
+}
 
 /* --- vista de calendario de la parrilla --- */
 .cal-header { display:flex; align-items:center; gap:0.8rem; padding:0.9rem 1rem; }
@@ -1632,19 +1692,31 @@ const FORMATOS_POR_CANAL = {
 
 // Flujo de producción completo (Notion-style). El orden importa: define el
 // avance visual en el tablero y la progresión esperada.
+// cardBg/cardText: color de fondo de TARJETA completa (no solo la pastilla
+// de estado) y su texto legible — usado en Calendario, Tablero y tarjetas
+// Kanban, para que el estado se reconozca de un vistazo sin tener que leer.
 const ESTADO_FLOW = [
-  { id: "idea", label: "Idea", class: "estado-idea" },
-  { id: "guion", label: "Guion", class: "estado-guion" },
-  { id: "pendiente", label: "Pendiente", class: "estado-pendiente" },
-  { id: "produccion", label: "En producción", class: "estado-produccion" },
-  { id: "edicion", label: "En edición", class: "estado-edicion" },
-  { id: "revision", label: "En revisión", class: "estado-revision" },
-  { id: "programado", label: "Programado", class: "estado-programado" },
-  { id: "publicado", label: "Publicado", class: "estado-publicado" }
+  { id: "idea", label: "Idea", class: "estado-idea", cardBg: "#F3F0FB", cardText: "#4A3F73" },
+  { id: "guion", label: "Guion", class: "estado-guion", cardBg: "#EDE7FB", cardText: "#5B3FA6" },
+  { id: "pendiente", label: "Pendiente", class: "estado-pendiente", cardBg: "#FFF1DB", cardText: "#8A5A14" },
+  { id: "produccion", label: "En producción", class: "estado-produccion", cardBg: "#FFE3D1", cardText: "#9C3C15" },
+  { id: "edicion", label: "En edición", class: "estado-edicion", cardBg: "#FDE0EC", cardText: "#93205A" },
+  { id: "revision", label: "En revisión", class: "estado-revision", cardBg: "#FFF5CC", cardText: "#705700" },
+  { id: "programado", label: "Programado", class: "estado-programado", cardBg: "#DCEBFF", cardText: "#154E8F" },
+  { id: "publicado", label: "Publicado", class: "estado-publicado", cardBg: "#DAF4E4", cardText: "#17633A" }
 ];
 function estadoInfo(estadoLabel) {
   return ESTADO_FLOW.find(e => e.label === estadoLabel) || ESTADO_FLOW[0];
 }
+
+// Ícono visual que distingue el FORMATO de la pieza (Reel, Story, etc.) sin
+// competir con el color de fondo, que ahora representa el Estado.
+const FORMATO_ICONO = {
+  "Reel": "🎬", "Carrusel": "🖼️", "Post único": "🖼️", "Story": "⏱️", "Live": "🔴",
+  "Video": "🎬", "Mensaje directo": "💬", "Estado": "⏱️", "Post": "🖼️", "Evento": "📅",
+  "Short": "🎬", "Video largo": "🎬", "Artículo": "📝", "Página": "📝", "Otro": "✨"
+};
+function formatoIcono(formato) { return FORMATO_ICONO[formato] || "📌"; }
 
 const BRAND_CONTEXT = `Eres el Estudio Creativo de VOLTA, una marca de pizza que se comporta como una marca gastronómica con mirada propia, no como una pizzería que usa redes para anunciar productos.
 
@@ -2025,7 +2097,23 @@ async function crearPiezaNuevaYAbrir() {
    sus items, para poder usarse tanto en la Parrilla principal (por mes) como
    dentro de un proyecto — sin duplicar esta lógica en los dos lugares. */
 const FREEBOARD_NOTE_COLORS = ["#FFF3B0", "#FFD6E8", "#D4F4DD", "#D6E8FF", "#E8D6FF", "#FFE0C7"];
-let fbState = { items: [], unsub: null, scale: 1, pan: {x:0,y:0}, path: null, selected: [] };
+
+// Metadatos visuales de cada tipo de tarjeta nueva del Laboratorio de Ideas:
+// clase CSS, ícono y etiqueta (kicker). Centralizado aquí para que agregar
+// un tipo futuro sea un único punto de cambio.
+const FB_TIPO_META = {
+  idea:       { clase: "tablero-idea",       icono: "💡", kicker: "Idea IA" },
+  tendencia:  { clase: "tablero-tendencia",   icono: "📈", kicker: "Tendencia" },
+  insight:    { clase: "tablero-insight",     icono: "🔎", kicker: "Insight" },
+  oportunidad:{ clase: "tablero-oportunidad", icono: "🎯", kicker: "Oportunidad" },
+  concepto:   { clase: "tablero-concepto",    icono: "✦",  kicker: "Concepto" }
+};
+let fbState = { items: [], unsub: null, scale: 1, pan: {x:0,y:0}, path: null, selected: [], meta: null, unsubMeta: null, guardando: false };
+// El nombre de sesión y el objetivo/pregunta central del tablero se guardan
+// como UN documento más dentro de la misma colección de Firestore del
+// tablero (id fijo "_meta"), para no crear una colección paralela y
+// mantener compatibilidad con la estructura existente.
+const FB_META_DOC_ID = "_meta";
 
 function renderFreeboard(containerId, firestorePath) {
   const container = document.getElementById(containerId);
@@ -2035,13 +2123,24 @@ function renderFreeboard(containerId, firestorePath) {
   fbState.selected = []; // ids de bloques seleccionados (para editar/combinar con IA)
 
   container.innerHTML =
+    '<div class="fb-header">' +
+      '<div class="fb-header-row1">' +
+        '<input type="text" id="fb-session-name" class="fb-session-name" placeholder="Sesión de brainstorming sin título" value="">' +
+        '<span class="fb-save-indicator" id="fb-save-indicator"></span>' +
+      '</div>' +
+      '<input type="text" id="fb-session-goal" class="fb-session-goal" placeholder="¿Cuál es el objetivo o la pregunta central de esta sesión? (opcional)" value="">' +
+    '</div>' +
     '<div class="tablero-toolbar">' +
-      '<button class="empty-btn" id="fb-add-note">+ Nota</button>' +
-      '<label class="empty-btn" id="fb-add-img-label" style="cursor:pointer;">+ Imagen propia<input type="file" accept="image/*" id="fb-add-img-input" style="display:none;"></label>' +
+      '<button class="empty-btn" id="fb-add-note">📝 Nota</button>' +
+      '<button class="empty-btn" id="fb-add-idea-btn">💡 Idea con IA</button>' +
+      '<button class="empty-btn" id="fb-open-trends-btn">📈 Tendencias</button>' +
+      '<label class="empty-btn" id="fb-add-img-label" style="cursor:pointer;">🖼️ Imagen<input type="file" accept="image/*" id="fb-add-img-input" style="display:none;"></label>' +
+      '<span class="fb-toolbar-spacer"></span>' +
       '<button class="tablero-zoom-btn" id="fb-zoom-out">−</button>' +
       '<span class="tablero-zoom-label" id="fb-zoom-label">100%</span>' +
       '<button class="tablero-zoom-btn" id="fb-zoom-in">+</button>' +
       '<button class="tablero-zoom-btn" id="fb-zoom-reset" title="Centrar vista">⤾</button>' +
+      '<button class="empty-btn" id="fb-export-btn" title="Exportar la sesión">⬇ Exportar</button>' +
     '</div>' +
     '<div class="tablero-viewport" id="fb-viewport">' +
       '<div class="tablero-canvas" id="fb-canvas"></div>' +
@@ -2053,6 +2152,9 @@ function renderFreeboard(containerId, firestorePath) {
     '</div>';
 
   document.getElementById("fb-add-note").addEventListener("click", () => freeboardAddNote());
+  document.getElementById("fb-add-idea-btn").addEventListener("click", () => abrirModalIdeaIA());
+  document.getElementById("fb-open-trends-btn").addEventListener("click", () => abrirPanelTendencias());
+  document.getElementById("fb-export-btn").addEventListener("click", () => abrirModalExportar());
   document.getElementById("fb-add-img-input").addEventListener("change", (e) => {
     const file = e.target.files[0];
     if (file) freeboardAddImage(file);
@@ -2063,13 +2165,22 @@ function renderFreeboard(containerId, firestorePath) {
   document.getElementById("fb-ai-send").addEventListener("click", () => freeboardAiSubmit());
   document.getElementById("fb-ai-prompt").addEventListener("keydown", (e) => { if (e.key === "Enter") freeboardAiSubmit(); });
 
+  // Nombre y objetivo de la sesión se guardan al perder el foco (blur), igual
+  // que el resto de campos editables de la app — sin botón "Guardar" aparte.
+  document.getElementById("fb-session-name").addEventListener("blur", (e) => freeboardSaveMeta({ nombre: e.target.value }));
+  document.getElementById("fb-session-goal").addEventListener("blur", (e) => freeboardSaveMeta({ objetivo: e.target.value }));
+
   freeboardSetupPan();
   freeboardSetupDropAndPaste();
   freeboardUpdateSelectionTag();
+  freeboardSubscribeMeta();
 
   if (fbState.unsub) fbState.unsub();
   fbState.unsub = claudeDb.collection(firestorePath).onSnapshot((snap) => {
-    fbState.items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // El documento de metadatos (_meta: nombre y objetivo de la sesión) vive
+    // en esta misma colección pero NUNCA es un bloque visual del lienzo —
+    // se excluye aquí explícitamente.
+    fbState.items = snap.docs.filter(d => d.id !== FB_META_DOC_ID).map(d => ({ id: d.id, ...d.data() }));
     freeboardRenderItems();
   });
 }
@@ -2149,6 +2260,32 @@ function freeboardSetupDropAndPaste() {
 
 // Calcula la siguiente capa (z-index lógico) para que un bloque nuevo
 // siempre aparezca por encima de todo lo existente, como en Canva.
+/* ---------------- metadatos de la sesión (nombre + objetivo) ---------------- */
+function freeboardSubscribeMeta() {
+  if (fbState.unsubMeta) fbState.unsubMeta();
+  fbState.unsubMeta = claudeDb.doc(fbState.path + "/" + FB_META_DOC_ID).onSnapshot(
+    (snap) => {
+      fbState.meta = snap.exists ? snap.data() : null;
+      const nameEl = document.getElementById("fb-session-name");
+      const goalEl = document.getElementById("fb-session-goal");
+      if (nameEl && document.activeElement !== nameEl) nameEl.value = (fbState.meta && fbState.meta.nombre) || "";
+      if (goalEl && document.activeElement !== goalEl) goalEl.value = (fbState.meta && fbState.meta.objetivo) || "";
+    },
+    (err) => console.error("freeboardSubscribeMeta error", err)
+  );
+}
+async function freeboardSaveMeta(campos) {
+  const indicator = document.getElementById("fb-save-indicator");
+  try {
+    if (indicator) { indicator.textContent = "Guardando..."; indicator.className = "fb-save-indicator show"; }
+    await claudeDb.doc(fbState.path + "/" + FB_META_DOC_ID).set(Object.assign({ tipo: "_meta" }, fbState.meta || {}, campos));
+    if (indicator) { indicator.textContent = "Guardado"; setTimeout(() => indicator.classList.remove("show"), 1200); }
+  } catch (e) {
+    console.error("freeboardSaveMeta error", e);
+    if (indicator) { indicator.textContent = "Error al guardar"; indicator.className = "fb-save-indicator show error"; }
+  }
+}
+
 function freeboardSiguienteZ() {
   return fbState.items.reduce((max, it) => Math.max(max, it.z || 0), 0) + 1;
 }
@@ -2196,19 +2333,26 @@ function freeboardRenderItems() {
         '</div>'
       : '';
     const zIndex = 100 + (it.z || 0);
+    const posStyle = 'left:' + it.x + 'px; top:' + it.y + 'px; width:' + it.w + 'px; height:' + it.h + 'px; z-index:' + zIndex + ';';
     if (it.tipo === "imagen") {
       const loadingOverlay = it.generando ? '<div class="tablero-img-loading"><span class="spin"></span></div>' : "";
-      return '<div class="tablero-item tablero-img' + selClass + '" data-id="' + it.id + '" style="left:' + it.x + 'px; top:' + it.y + 'px; width:' + it.w + 'px; height:' + it.h + 'px; z-index:' + zIndex + ';">' +
+      return '<div class="tablero-item tablero-img' + selClass + '" data-id="' + it.id + '" style="' + posStyle + '">' +
         '<img src="' + (it.url||"") + '" draggable="false">' + loadingOverlay +
         '<button class="tablero-item-del" data-id="' + it.id + '">×</button>' +
         controles +
       '</div>';
     }
-    return '<div class="tablero-item tablero-nota' + selClass + '" data-id="' + it.id + '" style="left:' + it.x + 'px; top:' + it.y + 'px; width:' + it.w + 'px; height:' + it.h + 'px; background:' + (it.color||"#FFF3B0") + '; z-index:' + zIndex + ';">' +
-      '<textarea class="tablero-nota-text" data-id="' + it.id + '" placeholder="Escribe una idea...">' + (it.texto||"") + '</textarea>' +
-      '<button class="tablero-item-del" data-id="' + it.id + '">×</button>' +
-      controles +
-    '</div>';
+    if (it.tipo === "nota") {
+      return '<div class="tablero-item tablero-nota' + selClass + '" data-id="' + it.id + '" style="' + posStyle + ' background:' + (it.color||"#FFF3B0") + ';">' +
+        '<textarea class="tablero-nota-text" data-id="' + it.id + '" placeholder="Escribe una idea...">' + escapeHtml(it.texto||"") + '</textarea>' +
+        '<button class="tablero-item-del" data-id="' + it.id + '">×</button>' +
+        controles +
+      '</div>';
+    }
+    // Tipos nuevos del Laboratorio de Ideas: idea, tendencia, insight,
+    // oportunidad, concepto — todos comparten la misma estructura de tarjeta
+    // (kicker + título + cuerpo editable + pie), diferenciados por color.
+    return freeboardRenderTarjetaTipada(it, selClass, posStyle, controles);
   }).join("");
 
   canvas.querySelectorAll(".tablero-item-del").forEach(btn => {
@@ -2227,6 +2371,29 @@ function freeboardRenderItems() {
       }
     });
   });
+  // Título y cuerpo editables de las tarjetas tipadas (Idea, Tendencia,
+  // Insight, Oportunidad, Concepto) — se guardan al perder el foco, igual
+  // que el resto de campos editables de la app.
+  canvas.querySelectorAll(".tablero-card-title, .tablero-card-body").forEach(el => {
+    el.addEventListener("blur", () => {
+      const it = fbState.items.find(x => x.id === el.dataset.id);
+      if (!it) return;
+      const field = el.dataset.field;
+      const valorNuevo = el.textContent;
+      if (valorNuevo !== (it[field]||"")) {
+        claudeDb.doc(fbState.path + "/" + el.dataset.id).set(Object.assign({}, it, { [field]: valorNuevo }));
+      }
+    });
+    // clic dentro del texto no debe disparar la selección/deselección del bloque
+    el.addEventListener("click", (e) => e.stopPropagation());
+    el.addEventListener("mousedown", (e) => e.stopPropagation());
+  });
+  canvas.querySelectorAll('[data-action="expandir"]').forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      freeboardExpandirIdea(btn.dataset.id);
+    });
+  });
   canvas.querySelectorAll(".layer-btn").forEach(btn => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -2239,7 +2406,7 @@ function freeboardRenderItems() {
   canvas.querySelectorAll(".tablero-item").forEach(el => {
     freeboardSetupItemDrag(el);
     el.addEventListener("click", (e) => {
-      if (e.target.tagName === "TEXTAREA" || e.target.classList.contains("tablero-item-del") || e.target.classList.contains("tablero-resize-handle") || e.target.classList.contains("layer-btn")) return;
+      if (e.target.tagName === "TEXTAREA" || e.target.isContentEditable || e.target.classList.contains("tablero-item-del") || e.target.classList.contains("tablero-resize-handle") || e.target.classList.contains("layer-btn") || e.target.classList.contains("tablero-card-expand-btn")) return;
       const id = el.dataset.id;
       if (e.shiftKey) {
         // Shift+clic: añade o quita del grupo seleccionado (selección múltiple)
@@ -2349,11 +2516,25 @@ const FREEBOARD_MAX_IMAGENES_CONTEXTO = 6;
 function freeboardBuildContext() {
   const notas = fbState.items.filter(it => it.tipo === "nota" && it.texto && it.texto.trim());
   const imagenes = fbState.items.filter(it => it.tipo === "imagen" && it.url);
+  // Tarjetas tipadas del Laboratorio de Ideas (idea, tendencia, insight,
+  // oportunidad, concepto) — se incluyen agrupadas por tipo para que Gemini
+  // sepa qué ya existe en el tablero y no repita ideas ya exploradas.
+  const tarjetasTipadas = fbState.items.filter(it => FB_TIPO_META[it.tipo] && (it.titulo || it.cuerpo));
+
   let ctx = "Contenido actual del tablero de brainstorming:\n";
   if (notas.length) {
     ctx += notas.map((n, i) => "- Nota " + (i+1) + ": " + n.texto.trim()).join("\n") + "\n";
   } else {
     ctx += "- (no hay notas de texto todavía)\n";
+  }
+  if (tarjetasTipadas.length) {
+    Object.keys(FB_TIPO_META).forEach(tipo => {
+      const deEsteTipo = tarjetasTipadas.filter(it => it.tipo === tipo);
+      if (deEsteTipo.length) {
+        ctx += "- " + FB_TIPO_META[tipo].kicker + "s ya en el tablero:\n" +
+          deEsteTipo.map(it => "  · " + (it.titulo||"") + (it.cuerpo ? ": " + it.cuerpo : "")).join("\n") + "\n";
+      }
+    });
   }
   if (imagenes.length) {
     ctx += "- Se adjuntan " + Math.min(imagenes.length, FREEBOARD_MAX_IMAGENES_CONTEXTO) + " imagen(es) del tablero como referencia visual.\n";
@@ -2442,6 +2623,33 @@ async function freeboardAskGemini(mensaje, imagenes) {
   return res.text || "No se obtuvo respuesta.";
 }
 
+// Variante de freeboardAskGemini que le pide a Gemini responder en JSON
+// estricto (un array de objetos), para los casos donde necesitamos varias
+// ideas/tarjetas estructuradas en vez de un solo bloque de texto libre.
+// Reutiliza el mismo backend y acción "chat" — no se agregó ninguna acción
+// nueva a Code.gs para esto.
+async function freeboardAskGeminiJSON(mensaje, systemPromptExtra) {
+  const instruccionFormato = "\n\nResponde ÚNICAMENTE con un array JSON válido, sin texto antes ni después, sin bloques de código markdown (nada de ```). Cada elemento del array debe ser un objeto con exactamente las claves \"titulo\" y \"cuerpo\" (ambas strings cortos). No agregues ninguna otra clave.";
+  const res = await sgBackendCall({
+    action: "chat",
+    messages: [{ role: "user", content: mensaje + instruccionFormato }],
+    systemPrompt: (systemPromptExtra || "Eres el Estudio Creativo de VOLTA, colaborando en una sesión de brainstorming visual.")
+  });
+  const texto = (res.text || "").trim();
+  // Limpieza defensiva: a veces el modelo igual envuelve la respuesta en
+  // ```json ... ``` pese a la instrucción; se extrae el array igualmente.
+  const match = texto.match(/\[[\s\S]*\]/);
+  const jsonCandidato = match ? match[0] : texto;
+  try {
+    const parsed = JSON.parse(jsonCandidato);
+    if (!Array.isArray(parsed)) throw new Error("La respuesta no fue un array.");
+    return parsed.filter(it => it && typeof it.titulo === "string");
+  } catch (e) {
+    console.error("freeboardAskGeminiJSON: no se pudo parsear la respuesta", texto, e);
+    throw new Error("La IA no devolvió un formato válido. Intenta de nuevo.");
+  }
+}
+
 // Genera un bloque de imagen nuevo a partir de un prompt y lo coloca cerca
 // del centro de la vista actual (igual que freeboardAddImage, pero con
 // contenido generado por IA en vez de un archivo subido).
@@ -2470,11 +2678,324 @@ async function freeboardAddNoteWithText(texto) {
   });
 }
 
+// Crea una tarjeta tipada (idea/tendencia/insight/oportunidad/concepto) en
+// una posición dada, con tamaño por defecto razonable. Centraliza la
+// escritura en Firestore para los 5 tipos nuevos.
+async function freeboardAddTarjetaTipada(tipo, campos, x, y) {
+  return await claudeDb.collection(fbState.path).add(Object.assign({
+    tipo, x, y, w: 240, h: 180, z: freeboardSiguienteZ(), createdAt: new Date().toISOString()
+  }, campos));
+}
+
+// Calcula una posición en cuadrícula para colocar varias tarjetas nuevas sin
+// que queden apiladas exactamente en el mismo punto (serpenteo simple).
+function freeboardPosicionEnGrilla(indice, baseX, baseY) {
+  const columnas = 3;
+  const col = indice % columnas;
+  const fila = Math.floor(indice / columnas);
+  return { x: baseX + col * 260, y: baseY + fila * 200 };
+}
+
+function freeboardCentroVista() {
+  const viewport = document.getElementById("fb-viewport");
+  const rect = viewport.getBoundingClientRect();
+  return {
+    x: (rect.width/2 - fbState.pan.x) / fbState.scale - 350,
+    y: (rect.height/2 - fbState.pan.y) / fbState.scale - 150
+  };
+}
+
+/* ---------------- modal: generar ideas con IA ---------------- */
+function abrirModalIdeaIA() {
+  let overlay = document.getElementById("idea-ia-modal-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.className = "gw-modal-overlay";
+    overlay.id = "idea-ia-modal-overlay";
+    overlay.innerHTML =
+      '<div class="gw-modal" style="max-width:480px;">' +
+        '<button class="gw-modal-close" id="idea-ia-modal-close">×</button>' +
+        '<h3>Generar ideas con IA</h3>' +
+        '<p class="gw-hint">Describe el tema, objetivo o tendencia de partida. Cada idea aparecerá como una tarjeta propia en el tablero, lista para editar o desarrollar.</p>' +
+        '<div class="gw-field">' +
+          '<label>Tema u objetivo</label>' +
+          '<textarea id="idea-ia-tema" rows="3" placeholder="Ej: ideas de contenido para el lanzamiento de la pizza de temporada" style="width:100%; font-family:inherit; padding:0.6rem 0.8rem; border-radius:10px; border:1px solid var(--linen-warm); resize:vertical;"></textarea>' +
+        '</div>' +
+        '<div class="gw-field">' +
+          '<label>Cuántas ideas (entre 3 y 8)</label>' +
+          '<input type="number" id="idea-ia-cantidad" min="3" max="8" value="5" style="width:100px;">' +
+        '</div>' +
+        '<button class="empty-btn" id="idea-ia-generar-btn" style="width:100%;">✨ Generar ideas</button>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.classList.remove("open"); });
+    document.getElementById("idea-ia-modal-close").addEventListener("click", () => overlay.classList.remove("open"));
+    document.getElementById("idea-ia-generar-btn").addEventListener("click", generarIdeasIA);
+  }
+  document.getElementById("idea-ia-tema").value = "";
+  overlay.classList.add("open");
+  setTimeout(() => document.getElementById("idea-ia-tema").focus(), 50);
+}
+
+async function generarIdeasIA() {
+  const tema = document.getElementById("idea-ia-tema").value.trim();
+  if (!tema) return;
+  // límites razonables, como pide la especificación — entre 3 y 8 ideas
+  const cantidad = Math.max(3, Math.min(8, Number(document.getElementById("idea-ia-cantidad").value) || 5));
+  const btn = document.getElementById("idea-ia-generar-btn");
+  btn.disabled = true;
+  const textoOriginal = btn.textContent;
+  btn.textContent = "Generando ideas...";
+  try {
+    const contextoTablero = freeboardBuildContext();
+    const prompt = contextoTablero + "\n\nGenera exactamente " + cantidad + " ideas DISTINTAS y accionables (evita variaciones casi idénticas entre sí) sobre: " + tema + ". Para cada una, \"titulo\" es un título corto y concreto, y \"cuerpo\" es 1-2 frases que la desarrollan.";
+    const ideas = await freeboardAskGeminiJSON(prompt);
+    if (!ideas.length) throw new Error("La IA no generó ninguna idea.");
+    const base = freeboardCentroVista();
+    await Promise.all(ideas.map((idea, i) => {
+      const pos = freeboardPosicionEnGrilla(i, base.x, base.y);
+      return freeboardAddTarjetaTipada("idea", { titulo: idea.titulo, cuerpo: idea.cuerpo || "" }, pos.x, pos.y);
+    }));
+    document.getElementById("idea-ia-modal-overlay").classList.remove("open");
+    refreshUsagePill();
+  } catch (e) {
+    console.error("generarIdeasIA error", e);
+    showToast("No se pudieron generar las ideas: " + (e.message || "error"), "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = textoOriginal;
+  }
+}
+
+// Botón "Desarrollar con IA →" de una tarjeta de idea: le pide a Gemini que
+// la amplíe/profundice, y el resultado aparece como una tarjeta NUEVA de
+// tipo "concepto", enlazada a la original (origenId) para conservar la
+// referencia — nunca sobreescribe la idea original.
+async function freeboardExpandirIdea(id) {
+  const it = fbState.items.find(x => x.id === id);
+  if (!it) return;
+  showToast("Desarrollando la idea con IA...", "info");
+  try {
+    const prompt = "Toma esta idea y desarróllala en un concepto más concreto y accionable:\nTítulo: " + it.titulo + "\nDescripción: " + (it.cuerpo||"") +
+      "\n\nResponde con UN solo objeto (no un array) en JSON con \"titulo\" (el concepto ya desarrollado, como título) y \"cuerpo\" (la dirección creativa concreta: qué hacer, por qué, y un posible ángulo o mensaje).";
+    const res = await sgBackendCall({
+      action: "chat",
+      messages: [{ role: "user", content: prompt + "\n\nResponde SOLO con el objeto JSON, sin texto adicional ni markdown." }],
+      systemPrompt: "Eres el Estudio Creativo de VOLTA, desarrollando una idea de brainstorming en un concepto concreto."
+    });
+    const match = (res.text||"").match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(match ? match[0] : res.text);
+    const nuevaX = it.x + it.w + 40, nuevaY = it.y;
+    await freeboardAddTarjetaTipada("concepto", { titulo: parsed.titulo, cuerpo: parsed.cuerpo, origenId: id }, nuevaX, nuevaY);
+    refreshUsagePill();
+  } catch (e) {
+    console.error("freeboardExpandirIdea error", e);
+    showToast("No se pudo desarrollar la idea: " + (e.message || "error"), "error");
+  }
+}
+
+// Esta se completa en una próxima entrega (exportación de la sesión).
+function abrirModalExportar() {
+  showToast("La exportación (JSON/Markdown) llega en una próxima entrega.", "info");
+}
+
+/* ============================================================
+   PANEL DE EXPLORACIÓN DE TENDENCIAS (modo honesto)
+   ============================================================
+   IMPORTANTE — por qué este panel NO muestra gráficas de Google Trends:
+   Google no ofrece ninguna API pública ni oficial para consultar datos de
+   Trends de forma programática. Las únicas formas de "integrarlo" que
+   existen en la práctica son bibliotecas no oficiales que hacen scraping
+   del sitio (frágiles, y violan los términos de servicio de Google si se
+   usan así), o el widget embebible oficial, que solo sirve para MOSTRAR un
+   iframe interactivo — no entrega datos en bruto que se puedan analizar o
+   guardar como tarjeta.
+   Por eso este panel sigue el "modo alternativo honesto" que exige la
+   especificación: enlaces directos a Google Trends para seguir investigando
+   ahí, entrada manual de observaciones, importación de CSV (el propio
+   Google Trends permite exportar CSV desde su web — ese archivo SÍ se puede
+   analizar aquí), y análisis de esos datos con Gemini. Nunca se dibuja una
+   curva ni un porcentaje inventado.
+   ============================================================ */
+
+function abrirPanelTendencias() {
+  let panel = document.getElementById("trends-panel");
+  if (!panel) {
+    panel = document.createElement("div");
+    panel.id = "trends-panel";
+    panel.className = "trends-panel";
+    panel.innerHTML =
+      '<div class="trends-panel-head">' +
+        '<h3>📈 Explorar tendencias</h3>' +
+        '<button id="trends-panel-close" class="trends-panel-close-btn">×</button>' +
+      '</div>' +
+      '<p class="trends-panel-note">Google no ofrece una API pública de Trends, así que este panel no dibuja gráficas automáticas. En su lugar: abre la búsqueda real en Google Trends, y trae lo que encuentres (a mano o importando el CSV que Trends permite descargar) para que quede guardado y analizable en el tablero.</p>' +
+
+        '<div class="trends-section">' +
+          '<label class="trends-label">Término o tema a investigar</label>' +
+          '<div class="trends-row">' +
+            '<input type="text" id="trends-termino" placeholder="Ej: pizza artesanal Barranquilla">' +
+            '<select id="trends-region"><option value="CO">Colombia</option><option value="">Mundial</option><option value="MX">México</option><option value="AR">Argentina</option><option value="ES">España</option><option value="US">Estados Unidos</option></select>' +
+          '</div>' +
+          '<button class="empty-btn" id="trends-abrir-google-btn" style="width:100%; margin-top:0.5rem;">🔗 Abrir esta búsqueda en Google Trends</button>' +
+        '</div>' +
+
+        '<div class="trends-section">' +
+          '<label class="trends-label">Importar CSV exportado de Google Trends</label>' +
+          '<p class="trends-hint">En la página de resultados de Trends hay un botón de descarga (⬇) que exporta un CSV con los datos reales — impórtalo aquí para analizarlo.</p>' +
+          '<input type="file" id="trends-csv-input" accept=".csv">' +
+        '</div>' +
+
+        '<div class="trends-section">' +
+          '<label class="trends-label">O anota tus observaciones manualmente</label>' +
+          '<textarea id="trends-manual" rows="4" placeholder="Ej: en Google Trends, “pizza artesanal” muestra interés creciente en los últimos 30 días en Barranquilla, con un pico la última semana..." style="width:100%; font-family:inherit; padding:0.6rem 0.8rem; border-radius:10px; border:1px solid var(--linen-warm); resize:vertical;"></textarea>' +
+          '<button class="empty-btn" id="trends-guardar-manual-btn" style="width:100%; margin-top:0.5rem;">+ Agregar como tarjeta de tendencia</button>' +
+        '</div>' +
+
+        '<div class="trends-section" id="trends-csv-preview-section" style="display:none;">' +
+          '<label class="trends-label">Vista previa del CSV importado</label>' +
+          '<div id="trends-csv-preview"></div>' +
+          '<button class="empty-btn" id="trends-analizar-csv-btn" style="width:100%; margin-top:0.5rem;">✨ Analizar con IA y crear tarjeta</button>' +
+        '</div>';
+    document.body.appendChild(panel);
+
+    document.getElementById("trends-panel-close").addEventListener("click", () => panel.classList.remove("open"));
+    document.getElementById("trends-abrir-google-btn").addEventListener("click", abrirBusquedaGoogleTrends);
+    document.getElementById("trends-csv-input").addEventListener("change", manejarCsvTrends);
+    document.getElementById("trends-guardar-manual-btn").addEventListener("click", guardarTendenciaManual);
+    document.getElementById("trends-analizar-csv-btn").addEventListener("click", analizarCsvConIA);
+  }
+  panel.classList.add("open");
+}
+
+// Abre en una pestaña nueva la búsqueda real en el sitio de Google Trends —
+// un enlace directo y verídico, no una simulación.
+function abrirBusquedaGoogleTrends() {
+  const termino = document.getElementById("trends-termino").value.trim();
+  if (!termino) { showToast("Escribe un término para buscar.", "info"); return; }
+  const region = document.getElementById("trends-region").value;
+  const params = new URLSearchParams({ q: termino, hl: "es" });
+  if (region) params.set("geo", region);
+  window.open("https://trends.google.com/trends/explore?" + params.toString(), "_blank", "noopener");
+}
+
+let csvTrendsParseado = null; // guarda temporalmente las filas del último CSV importado, antes de confirmarlas
+
+// Lee y parsea el CSV que Google Trends permite exportar desde su propia
+// web. Parseo simple (separado por comas, con comillas básicas) suficiente
+// para el formato real de ese archivo — sin asumir columnas que Trends no
+// entrega.
+function manejarCsvTrends(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const lineas = String(reader.result).split(/\r?\n/).filter(l => l.trim());
+      const filas = lineas.map(l => l.split(",").map(c => c.replace(/^"|"$/g, "").trim()));
+      csvTrendsParseado = { nombreArchivo: file.name, filas };
+      const preview = document.getElementById("trends-csv-preview");
+      const previewSection = document.getElementById("trends-csv-preview-section");
+      preview.innerHTML = '<table class="trends-csv-table">' +
+        filas.slice(0, 8).map(fila => '<tr>' + fila.map(c => '<td>' + escapeHtml(c) + '</td>').join("") + '</tr>').join("") +
+      '</table>' + (filas.length > 8 ? '<p class="trends-hint">...y ' + (filas.length - 8) + ' filas más.</p>' : '');
+      previewSection.style.display = "";
+    } catch (err) {
+      showToast("No se pudo leer el CSV: " + err.message, "error");
+    }
+  };
+  reader.readAsText(file);
+}
+
+// Crea una tarjeta de tendencia con lo que el usuario escribió A MANO.
+// Se etiqueta explícitamente como "observación manual del usuario" (nunca
+// como si fuera un dato verificado automáticamente), tal como exige la
+// especificación: distinguir dato observado, dato manual e hipótesis de IA.
+async function guardarTendenciaManual() {
+  const termino = document.getElementById("trends-termino").value.trim();
+  const observacion = document.getElementById("trends-manual").value.trim();
+  if (!termino && !observacion) { showToast("Escribe un término o una observación primero.", "info"); return; }
+  const pos = freeboardCentroVista();
+  await freeboardAddTarjetaTipada("tendencia", {
+    titulo: termino || "Observación de tendencia",
+    cuerpo: observacion || "(sin notas adicionales)",
+    fuente: "Observación manual del usuario",
+    fecha: new Date().toLocaleDateString("es")
+  }, pos.x, pos.y);
+  document.getElementById("trends-manual").value = "";
+  showToast("Tarjeta de tendencia agregada al tablero.", "success");
+}
+
+// Le pide a Gemini que analice las filas reales del CSV importado (datos
+// verídicos, exportados por el propio Google Trends) y resuma lo relevante
+// — la tarjeta resultante se etiqueta con la fuente real (el archivo CSV),
+// nunca como un dato inventado por la IA.
+async function analizarCsvConIA() {
+  if (!csvTrendsParseado) return;
+  const btn = document.getElementById("trends-analizar-csv-btn");
+  btn.disabled = true;
+  const textoOriginal = btn.textContent;
+  btn.textContent = "Analizando...";
+  try {
+    const muestra = csvTrendsParseado.filas.slice(0, 30).map(f => f.join(" | ")).join("\n");
+    const prompt = "Este es un CSV real exportado desde Google Trends (archivo: " + csvTrendsParseado.nombreArchivo + "):\n" + muestra +
+      "\n\nResume en 2-4 frases qué muestra este dato (evolución, picos, comparación entre términos si aplica). No inventes cifras que no estén en los datos. Responde con UN objeto JSON con \"titulo\" (el término o comparación, corto) y \"cuerpo\" (el resumen).";
+    const res = await sgBackendCall({
+      action: "chat",
+      messages: [{ role: "user", content: prompt + "\n\nResponde SOLO con el objeto JSON, sin texto adicional ni markdown." }],
+      systemPrompt: "Eres un analista de datos cuidadoso. Nunca inventas cifras ni tendencias que no estén explícitamente en los datos entregados."
+    });
+    const match = (res.text||"").match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(match ? match[0] : res.text);
+    const pos = freeboardCentroVista();
+    await freeboardAddTarjetaTipada("tendencia", {
+      titulo: parsed.titulo, cuerpo: parsed.cuerpo,
+      fuente: "CSV de Google Trends (" + csvTrendsParseado.nombreArchivo + ") — análisis de IA",
+      fecha: new Date().toLocaleDateString("es")
+    }, pos.x, pos.y);
+    document.getElementById("trends-csv-preview-section").style.display = "none";
+    csvTrendsParseado = null;
+    refreshUsagePill();
+    showToast("Tarjeta de tendencia creada a partir del CSV.", "success");
+  } catch (e) {
+    console.error("analizarCsvConIA error", e);
+    showToast("No se pudo analizar el CSV: " + (e.message || "error"), "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = textoOriginal;
+  }
+}
+
+// Dibuja cualquiera de los 5 tipos nuevos de tarjeta con la misma estructura:
+// kicker (etiqueta de tipo), título editable, cuerpo editable, y un pie
+// opcional con la fuente/fecha cuando aplica (tarjetas de tendencia).
+// El título y el cuerpo quedan editables directamente (contenteditable),
+// para no obligar a volver a consultarle algo a Gemini por corregir una
+// palabra, tal como exige la especificación.
+function freeboardRenderTarjetaTipada(it, selClass, posStyle, controles) {
+  const meta = FB_TIPO_META[it.tipo] || FB_TIPO_META.idea;
+  const pie = it.fuente || it.fecha
+    ? '<div class="tablero-card-foot">' + escapeHtml([it.fuente, it.fecha].filter(Boolean).join(" · ")) + '</div>'
+    : '';
+  const expandBtn = it.origenId
+    ? '' // una tarjeta ya expandida no repite el botón, para no encadenar infinitamente sin control
+    : '<button class="tablero-card-expand-btn" data-id="' + it.id + '" data-action="expandir">Desarrollar con IA →</button>';
+  return '<div class="tablero-item tablero-card-typed ' + meta.clase + selClass + '" data-id="' + it.id + '" data-tipo="' + it.tipo + '" style="' + posStyle + '">' +
+    '<div class="tablero-card-kicker">' + meta.icono + ' ' + meta.kicker + '</div>' +
+    '<div class="tablero-card-title" contenteditable="true" data-id="' + it.id + '" data-field="titulo">' + escapeHtml(it.titulo||"") + '</div>' +
+    '<div class="tablero-card-body" contenteditable="true" data-id="' + it.id + '" data-field="cuerpo">' + escapeHtml(it.cuerpo||"") + '</div>' +
+    pie + expandBtn +
+    '<button class="tablero-item-del" data-id="' + it.id + '">×</button>' +
+    controles +
+  '</div>';
+}
+
 function freeboardSetupItemDrag(el) {
   let dragging = false, startX = 0, startY = 0, origX = 0, origY = 0;
   el.addEventListener("mousedown", (e) => {
-    if (e.target.tagName === "TEXTAREA" || e.target.classList.contains("tablero-item-del") ||
-        e.target.classList.contains("tablero-resize-handle") || e.target.classList.contains("layer-btn")) return;
+    if (e.target.tagName === "TEXTAREA" || e.target.isContentEditable || e.target.classList.contains("tablero-item-del") ||
+        e.target.classList.contains("tablero-resize-handle") || e.target.classList.contains("layer-btn") ||
+        e.target.classList.contains("tablero-card-expand-btn")) return;
     dragging = true;
     startX = e.clientX; startY = e.clientY;
     origX = parseFloat(el.style.left); origY = parseFloat(el.style.top);
@@ -2544,7 +3065,7 @@ function renderCalendarView(containerId) {
         '<div class="cal-daynum">' + d + '</div>' +
         '<div class="cal-pieces">' +
           piezasDia.slice(0, 3).map(it => (
-            '<div class="cal-piece" draggable="true" data-id="' + it.id + '" style="' + piezaCardEstilo(it) + '">' + (it.horaInicio ? '<span class="cal-piece-hora">' + it.horaInicio + '</span> ' : '') + escapeHtml(it.pieza) + '</div>'
+            '<div class="cal-piece" draggable="true" data-id="' + it.id + '" style="' + piezaCardEstilo(it) + '">' + formatoIcono(it.formato) + ' ' + (it.horaInicio ? '<span class="cal-piece-hora">' + it.horaInicio + '</span> ' : '') + escapeHtml(it.pieza) + '</div>'
           )).join("") +
           (piezasDia.length > 3 ? '<button class="cal-piece-more" data-fecha="' + iso + '">+' + (piezasDia.length - 3) + ' más</button>' : '') +
         '</div>' +
@@ -2565,7 +3086,7 @@ function renderCalendarView(containerId) {
       '<div class="cal-agenda-day' + (esHoy ? " cal-agenda-today" : "") + '" data-fecha="' + iso + '">' +
         '<div class="cal-agenda-daynum">' + d + ' ' + nombreDia.charAt(0).toUpperCase() + nombreDia.slice(1) + '</div>' +
         piezasDia.map(it => (
-          '<div class="cal-piece" data-id="' + it.id + '" style="' + piezaCardEstilo(it) + ' margin-bottom:0.3rem;">' + (it.horaInicio ? '<span class="cal-piece-hora">' + it.horaInicio + '</span> ' : '') + escapeHtml(it.pieza) + '</div>'
+          '<div class="cal-piece" data-id="' + it.id + '" style="' + piezaCardEstilo(it) + ' margin-bottom:0.3rem;">' + formatoIcono(it.formato) + ' ' + (it.horaInicio ? '<span class="cal-piece-hora">' + it.horaInicio + '</span> ' : '') + escapeHtml(it.pieza) + '</div>'
         )).join("") +
         '<button class="cal-add-btn" style="position:static; opacity:1; width:auto; height:auto; border-radius:6px; padding:0.2rem 0.6rem; font-size:0.7rem; margin-top:0.2rem;" data-fecha="' + iso + '">+ Agregar</button>' +
       '</div>'
@@ -2637,7 +3158,7 @@ function abrirPopoverDia(anchorEl, fechaISO, piezasDia) {
   pop.innerHTML =
     '<div class="cal-day-popover-head">' + fechaDisplay(fechaISO) + '</div>' +
     piezasDia.map(it => (
-      '<div class="cal-piece" data-id="' + it.id + '" style="' + piezaCardEstilo(it) + '">' + (it.horaInicio ? '<span class="cal-piece-hora">' + it.horaInicio + '</span> ' : '') + escapeHtml(it.pieza) + '</div>'
+      '<div class="cal-piece" data-id="' + it.id + '" style="' + piezaCardEstilo(it) + '">' + formatoIcono(it.formato) + ' ' + (it.horaInicio ? '<span class="cal-piece-hora">' + it.horaInicio + '</span> ' : '') + escapeHtml(it.pieza) + '</div>'
     )).join("");
   document.body.appendChild(pop);
   const rect = anchorEl.getBoundingClientRect();
@@ -2687,16 +3208,18 @@ function colorTextoLegible(hexColor) {
   return luminancia > 0.6 ? "#2A2827" : "#FFFFFF";
 }
 
-// Genera el CSS inline de una tarjeta de pieza en el calendario: si el
-// usuario eligió un color MANUAL para esta pieza, se usa como fondo completo
-// (con el texto calculado para que siempre se lea bien) — así se nota que es
-// una elección intencional. Si no hay color manual, se usa solo como borde
-// lateral sobre fondo neutro (el comportamiento de antes, ligado al pilar).
+// Genera el CSS inline de fondo de una tarjeta de pieza. Prioridad:
+// 1) color MANUAL elegido por el usuario (siempre gana, es una decisión
+//    explícita) — fondo completo con texto calculado para legibilidad.
+// 2) si no hay color manual, el fondo es el del ESTADO de la pieza (Idea,
+//    Guion, Pendiente...) — así se reconoce el flujo de trabajo de un
+//    vistazo en Calendario, Tablero y tarjetas Kanban.
 function piezaCardEstilo(it) {
   if (it.color) {
     return "background:" + it.color + "; border-left-color:" + it.color + "; color:" + colorTextoLegible(it.color) + ";";
   }
-  return "border-left-color:" + piezaColor(it) + ";";
+  const info = estadoInfo(it.estado);
+  return "background:" + info.cardBg + "; border-left-color:" + piezaColor(it) + "; color:" + info.cardText + ";";
 }
 
 function abrirSelectorColorPieza(anchorEl, it) {
@@ -2861,9 +3384,9 @@ function renderBoard() {
     return '<div class="board-col" data-pilar="' + p + '"><div class="bc-head">' + pillarPill(p) + '<span class="bc-count">' + cards.length + '</span></div>' +
       '<div class="bc-drop-zone" data-pilar="' + p + '">' +
       cards.map(it => (
-        '<div class="board-card" draggable="true" data-id="' + it.id + '" style="border-left:3px solid ' + piezaColor(it) + ';"><div class="bcard-fecha">' + fechaDisplay(it.fechaISO) + (it.horaInicio ? ' ' + it.horaInicio : '') + ' · ' + it.formato + '</div>' +
+        '<div class="board-card" draggable="true" data-id="' + it.id + '" style="' + piezaCardEstilo(it) + ' border-left-width:3px; border-left-style:solid;"><div class="bcard-fecha">' + formatoIcono(it.formato) + ' ' + fechaDisplay(it.fechaISO) + (it.horaInicio ? ' ' + it.horaInicio : '') + ' · ' + it.formato + '</div>' +
         '<div class="bcard-title">' + it.pieza + '</div>' +
-        '<div class="badge-row">' + estadoPill(it.estado) + prioridadPill(it.prioridad) + '</div></div>'
+        '<div class="badge-row">' + prioridadPill(it.prioridad) + '</div></div>'
       )).join("") + '</div></div>';
   }).join("");
 
